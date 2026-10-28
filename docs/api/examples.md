@@ -7,10 +7,18 @@ library's views are then proved for it once, and every catalogue analysis become
 example, `While`'s `x + y` is `wrap32 (x + y)` over `Z`; one bridge equation says it equals
 `Bits.eval` of the 32-bit addition, so every `Domains` operator transfer works for it.
 
-The theory is `Gaulois.Examples`, with sub-theories `While` and `Ssa`. Nothing here is a model
+The theory is `Gaulois.Examples`, with subdirectories `While` and `Ssa`. Nothing here is a model
 of the library: a toy never imports a `Bits` operator into its semantics. Every theorem below is
 required and proved; every `Example` is small enough for `vm_compute` and is a smoke check, except
 those named as the acceptance evidence of a checker, which are required.
+
+The `examples/While` and `examples/Ssa` files are production reference-client modules and use
+the `Examples` basename prefix. Computed `Example` declarations belong in `tests/Examples`,
+with the same statements and ownership as below. Definitions needed by those examples and the
+contracted theorems remain in the production modules. A reference below to an analysis module
+for a computed `Example` identifies its client and owner, not its physical test location.
+Their qualified names use `Gaulois.Tests.Examples.<owned test module>` instead of the production
+`Gaulois.Examples.{While,Ssa}.Examples*` module paths.
 
 ## Files
 
@@ -21,7 +29,7 @@ those named as the acceptance evidence of a checker, which are required.
 | `ExamplesWhileBridge.v` | the bridge equations to `Bits`, one per operator | EX-4 |
 | `ExamplesWhileSkeleton.v` | translation to the skeleton, client, bisimulation, behaviour transport | EX-4 |
 | `ExamplesWhileViews.v` | skeleton-client laws, variable, demand and effects views, region summaries | EX-4 |
-| `ExamplesWhileAnalyses.v` | instantiation theorems and computed `Example`s | EX-4, ANA-2 |
+| `ExamplesWhileAnalyses.v` | instantiation theorems and fixtures for computed examples | EX-4, ANA-2 |
 | `ExamplesSsaSyntax.v` | types, values, operators, instructions, terminators, functions | EX-2 |
 | `ExamplesSsaTyping.v` | operator signatures, well-formedness and typed environments | EX-2 |
 | `ExamplesSsaTypingProofs.v` | operator typing, preservation and checker soundness | EX-2 |
@@ -34,7 +42,7 @@ those named as the acceptance evidence of a checker, which are required.
 | `ExamplesSsaMemory.v` | the full-program graph and memory views | EX-6 |
 | `ExamplesSsaPointers.v` | pointer view, footprints, pointer and zero laws | ANA-9 |
 | `ExamplesSsaBytes.v` | byte view and byte laws | ANA-10a |
-| `ExamplesSsaAnalyses.v` | instantiation theorems and computed `Example`s, factorial included | EX-5a, ANA-3 to ANA-9, ANA-10a, ANA-10e |
+| `ExamplesSsaAnalyses.v` | instantiation theorems and fixtures, factorial included | EX-5a, ANA-3 to ANA-9, ANA-10a, ANA-10e |
 
 ## Definitions
 
@@ -909,7 +917,9 @@ Proof idea: the views are definitions by cases on the instruction kind. `guard_o
 computes its comparison from the values it holds, so at a taken edge the guard subject holds the
 result of its operation on the current values of its arguments (by dominance of the arguments, which
 the well-formedness gives, the arguments are bound and unchanged since the comparison ran);
-`value_origin` by the rule that bound the value; `ssa_truth_nonzero` is `reflexivity` on the view.
+`value_origin` by case analysis on the step: the binding is unchanged or comes from the rule that
+bound it, including parallel parameter bindings and arbitrary call results; `ssa_truth_nonzero`
+is `reflexivity` on the view.
 The demand laws follow the same case analysis as the variable view, with `trap_covered`-style
 reasoning for the trapping `IOp`s, which `ssa_effects` marks effectful under KeepTraps. Card: EX-5a.
 
@@ -997,8 +1007,9 @@ Theorem ssa_sccp_sound (ext : nat -> list cval -> option cval) (P : program) (f 
     (sigma : sparse_unknown label ssa_edge vid -> lift_bot (tagged (flat Z))) :
   wf_program ext P -> In f (map fst (funcs P)) ->
   post_solution (lift_bot_lattice (lat const_numeric))
-    (sparse_system (numeric_problem const_numeric const_conc ssa_bridge TAny
-       (ssa_block_view ext P f) (values_of P f) (fun _ => TAny))) sigma ->
+    (sparse_system label_encoding var_encoding
+       (numeric_problem const_numeric const_conc ssa_bridge TAny
+         (ssa_block_view ext P f) (values_of P f) (fun _ => TAny))) sigma ->
   forall s x c, reachable_state (activation ext P f) s ->
     val (ssa_block_view ext P f) s x = Some c ->
     gamma (lift_bot_gamma (fact_conc (sparse_of_numeric const_numeric const_conc ssa_bridge TAny)))

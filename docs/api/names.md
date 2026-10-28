@@ -1059,8 +1059,6 @@ Contract: [Examples](examples.md).
   `while_region_table_agrees` — Theorems; ANA-2 structured analysis and certificate claims.
 - `factorial_while`, `factorial_while_dce`, `z_var`, `lcm_prog`, `lcm_result_ex` — Definitions;
   EX-4 factorial and lazy-code-motion fixtures.
-- `while_z_live`, `while_z_dead`, `while_dce_factorial`, `while_lcm_accepts` — Examples;
-  EX-4 computed liveness, erasure and code-motion checks.
 
 ### `ExamplesSsaAnalyses.v` — EX-5a, ANA-3, ANA-5 to ANA-9, ANA-10a, ANA-10e
 
@@ -1076,18 +1074,22 @@ Contract: [Examples](examples.md).
   and escape claims.
 - `ssa_immutable_sound` — Theorem; ANA-10a preservation of unwritten bytes.
 - `factorial_ssa`, `z_value`, `p_value`, `loop_header_point` — Definitions; EX-5a factorial fixture.
-- `factorial_wf`, `factorial_z_live`, `factorial_z_dead`, `factorial_p_needed` — Examples; EX-5a
-  computed typing, liveness and neededness checks.
 - `gvn_prog`, `gvn_first`, `gvn_second`, `gvn_problem` — Definitions; ANA-5 numbering fixture.
-- `gvn_merges` — Example; ANA-5 numbering accepts a common leader.
-- `egraph_optimise_accepts` — Example; ANA-6 checks an e-graph rewrite.
 - `count_up`, `count_up_n`, `count_up_chrec`, `count_up_inv` — Definitions; ANA-7 recurrence
   fixture.
-- `scev_count_up_trip` — Example; ANA-7 computes and checks a trip count.
 - `chain_graph`, `chain_writes`, `chain_writes_clobber`, `chain_reads`, `chain_ssa` — Definitions;
   ANA-10e MemorySSA fixtures.
-- `memoryssa_accepts`, `memoryssa_rejects` — Examples; ANA-10e checks a valid and invalid
-  clobber walk.
+
+### Computed Examples in `tests/Examples`
+
+- `ExamplesWhileViewsTest.v` — EX-4: `while_z_live`, `while_z_dead`, `while_dce_factorial`,
+  `while_lcm_accepts`.
+- `ExamplesSsaViewsTest.v` — EX-5a: `factorial_wf`, `factorial_z_live`, `factorial_z_dead`,
+  `factorial_p_needed`.
+- `ExamplesSsaANA5Test.v` — ANA-5: `gvn_merges`.
+- `ExamplesSsaANA6Test.v` — ANA-6: `egraph_optimise_accepts`.
+- `ExamplesSsaANA7Test.v` — ANA-7: `scev_count_up_trip`.
+- `ExamplesSsaANA10eTest.v` — ANA-10e: `memoryssa_accepts`, `memoryssa_rejects`.
 
 ## Views
 

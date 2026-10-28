@@ -1,8 +1,13 @@
 # Analysis catalogue
 
-Every entry below is planned and unimplemented in the current skeleton. Contracts in `api/` specify
-the contracted definitions and claims; the cards assign implementation and verification work.
-A catalogue entry is a composition of shared domains, views, solvers and checkers.
+The catalogue describes the intended scope, including work not yet implemented. Contracts in
+`api/` specify definitions and claims; cards assign implementation and verification work. A
+catalogue entry may compose several shared domains, views, solvers and checkers.
+
+At 2026-10-28 23:41 UTC, landed work covers foundations, parts of Graph and Fixpoint, sorted
+Rewrite syntax, e-graph rebuilding, pattern matching and class analyses, Rules syntax, and basic
+views. Individual landed cards report checked claims and examples; the remaining entries and
+compositions are not implied to be complete. The run ledger is the current card-by-card status.
 
 - **Graph:** reachability, RPO, merge nodes, selectable LT and Semi-NCA dominators and
   post-dominators, frontiers, control dependence, SCCs, loops, WTO, reducibility, forwarding

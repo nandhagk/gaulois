@@ -1,7 +1,7 @@
 # References
 
-These sources inform the planned algorithms and proofs. Each API contract's “Algorithms and
-references” section gives the relevant details and identifies the local design choices.
+These sources inform the algorithms and proofs, both landed and planned. Each API contract's
+“Algorithms and references” section gives the relevant details and identifies the local choices.
 
 - P. Cousot and R. Cousot, “Abstract interpretation: a unified lattice model for static analysis
   of programs by construction or approximation of fixpoints,” POPL, 1977;

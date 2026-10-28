@@ -970,7 +970,7 @@ End Gra2b.
 Section Gra3a.
 Context {V E : Type} (EV : encoding V) (g : Graph.t V E) (p : prepared EV g).
 Variables (u v : V) (e : E) (region : list V).
-Local Notation R := (scc p).
+Local Abbreviation R := (scc p).
 
 (** The components partition the region, and two nodes share one exactly when each reaches the other inside it. *)
 Theorem scc_within_exact : ready EV g p -> incl region (Graph.nodes g) ->
@@ -1080,6 +1080,7 @@ Theorem reducible_b_correct : ready EV g p -> dominator_exact p = true ->
 
 (** One reverse search computes a natural loop. *)
 Theorem natural_loop_nodes_exact : ready EV g p -> In (Graph.source g e) (Graph.nodes g) ->
+  In x (Graph.nodes g) ->
   (FinSet.mem EV x (natural_loop_nodes p e) = true <-> natural_loop EV g e x).
 (* Proof idea: dfs_exact on prepared_reverse with the target blocked, and reverse_path; the target is added by hand. Card: GRA-4a. *)
 End Gra4a.

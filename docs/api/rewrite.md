@@ -356,7 +356,9 @@ Theorem rw_match_complete {K Sort V H} (EK : encoding K) (ES : encoding Sort)
     (EV : encoding V) (EH : encoding H) (sig : rw_signature K Sort V) (g : rw_graph K Sort V)
     (root : rw_id) (p : rw_pattern K Sort V H) (sub : rw_substitution K Sort V H)
     (t : rw_term K Sort V) :
-  rw_graph_wf sig g -> rw_clean g -> rw_instantiate sub p = Some t -> rw_represents g root t ->
+  rw_graph_wf sig g -> rw_clean g ->
+  rwp_typed sig (fun h => option_map rw_sort (sub h)) p ->
+  rw_instantiate sub p = Some t -> rw_represents g root t ->
   exists a, In a (rw_match EK ES EV EH g root p) /\ rw_covers EH g p a sub.
 ```
 

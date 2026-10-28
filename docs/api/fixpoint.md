@@ -177,7 +177,7 @@ Conventions of this document. Names are those of the anchors, as the rulings ame
   `Query.eval`, `Query.reads`, `Query.sides` and `Query.run`. Constraint systems live in
   `Module System`: `System.t X C A` with `System.constraints`, `System.target` and `System.rhs`, and
   `System.static S` with `System.deps`, `System.side_targets`, `System.reads_within` and
-  `System.sides_within`. `Notation deps := System.deps` and `Notation side_targets :=
+  `System.sides_within`. `Abbreviation deps := System.deps` and `Abbreviation side_targets :=
   System.side_targets` make the two summaries bare, as Views writes them. Graphs are `Graph.t V E`
   with `Graph.entries`, `Graph.nodes`, `Graph.out`, `Graph.source` and `Graph.target`, so no
   projection is ever shared between `System` and `Graph`.
@@ -276,8 +276,8 @@ Record static {X C A} (S : t X C A) : Type := Static {
   sides_within : forall c s, incl (map fst (Query.sides (rhs S c) s)) (side_targets c)
 }.
 End System.
-Notation deps := System.deps.
-Notation side_targets := System.side_targets.
+Abbreviation deps := System.deps.
+Abbreviation side_targets := System.side_targets.
 Definition post_solution {X C A} (L : lattice A) (S : System.t X C A) (s : X -> A) : Prop :=
   forall c, In c (System.constraints S) ->
     leb L (Query.eval (System.rhs S c) s) (s (System.target S c)) = true /\
@@ -593,7 +593,8 @@ Definition local_solve {X C A} (EX : encoding X) (EC : encoding C) (L : lattice 
    closed under "x in E, c in contributors_of x, y in deps c gives y in E"; the queue starts with the
    constraints that contribute to E and the engine runs as engine_step with Declared SS ix, joins or
    widening as st says; explored = E. Untrusted: no theorem about its values. Acceptance evidence:
-   a required Example in Examples runs local_checked on a three-unknown cyclic system and gets Some. *)
+   a required Example in tests/Fixpoint/FixpointFIX4.v runs local_checked on a three-unknown
+   cyclic system and gets Some. *)
 Definition local_checked {X C A} (EX : encoding X) (EC : encoding C) (L : lattice A) (sch : scheduler X)
     (st : strategy) (S : System.t X C A) (SS : System.static S) (ix : sys_index X C)
     (roots : list X) (fuel : positive) : option (local_result X A) :=

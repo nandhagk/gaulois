@@ -18,7 +18,7 @@ ocamlformat 0.29.0 and just 1.58.0. The shell enables the shared Dune cache in h
 
 `just build` builds all default targets; pass targets to restrict it, for example
 `just build theories/Graph`. `just test` builds the tests, examples and inline tests. `just check`
-currently checks formatting; TOOL-1 adds the source and claims checks. `just fmt` formats sources;
+checks formatting, source hygiene, layout and theorem assumptions. `just fmt` formats sources;
 if it rewrites files, run it again to check the resulting state. The planned bench arrives with
 TOOL-2; there is no bench recipe yet.
 
@@ -28,8 +28,9 @@ The recipes run in `gaulois.slice` with a 1536 MiB default per-command memory ca
 rules for agents, including one heavy command at a time and no override of the per-command cap.
 A build can warn about dependency theories that do not yet contain a `.v` file and still succeed.
 
-The setup's previous capped `nix develop --no-update-lock-file -c just build` succeeded on the
-original skeleton. That smoke check does not establish a full implementation build. Run tests
-appropriate to each card and follow `run/RUNBOOK.md` for reviews, claims audits and landing.
+Landed cards report their own focused builds and checks; they do not substitute for the planned
+fresh FINAL build. Run tests appropriate to each card and follow `run/RUNBOOK.md` for reviews,
+claims audits and landing. The examples layout checker needs a tooling repair before the affected
+example cards can land; the run ledger records its current status.
 Focused measurements may use the planned harness for a specific unresolved choice; benchmarks are
 not a completion gate.

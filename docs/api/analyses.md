@@ -266,7 +266,7 @@ Definition lcm_check {S O N E U C} {U1 U2 U3 : list U} (EU : encoding U)
     (Graph.nodes (cfg (gkview gk))).
 (* `avail` and `busy` are the solutions of available_system and busy_system for gk, `avail2` the
    availability of the view whose gen is extended by insert r. The producer stays untrusted.
-   Acceptance evidence: `while_lcm_accepts`, a required Example in ExamplesWhileAnalyses.v. *)
+   Acceptance evidence: `while_lcm_accepts`, a required Example in ExamplesWhileViewsTest.v. *)
 ```
 
 ### ANA-2: structured code
@@ -417,11 +417,12 @@ Definition solve_values {S O N E V K C A} (pr : sparse_problem S O N E V K C A)
     (EN : encoding N) (EE : encoding E) (EV : encoding V)
     (HL : lattice_laws (lift_bot_lattice (fact_lat (domain pr))))
     (sch : scheduler (sparse_unknown N E V)) (st : strategy)
-    (HT : terminates (lift_bot_lattice (fact_lat (domain pr))) (sparse_static pr) sch st) :
+    (HT : terminates (lift_bot_lattice (fact_lat (domain pr))) (sparse_static EN EV pr) sch st) :
   {s : sparse_unknown N E V -> lift_bot A |
-     post_solution (lift_bot_lattice (fact_lat (domain pr))) (sparse_system pr) s} :=
+     post_solution (lift_bot_lattice (fact_lat (domain pr))) (sparse_system EN EV pr) s} :=
   solve_total (sparse_unknown_encoding EN EE EV) (sparse_constraint_encoding EN EE EV)
-    (lift_bot_lattice (fact_lat (domain pr))) HL sch st (sparse_system pr) (sparse_static pr) HT.
+    (lift_bot_lattice (fact_lat (domain pr))) HL sch st (sparse_system EN EV pr)
+    (sparse_static EN EV pr) HT.
 (* Composition. View: ssa_view over the activation semantics. Domain: the numeric domain under
    lift_bot. Engine: solve_total. Constants (flat) use Joining with the evidence from
    flat_height and option_height; known bits, intervals, wrapped intervals and the products use
@@ -671,7 +672,7 @@ Definition numbering_check {S O N E V K C} (EV : encoding V) (np : numbering_pro
    arguments, or Params of one block (at any positions) such that, for every edge into the block,
    the arguments at the members' positions are same-class; Arbitrary values are alone. Acceptance
    evidence: `dominator_numbering_checked`, `optimistic_numbering_checked`, and the required Example
-   `gvn_merges` in ExamplesSsaAnalyses.v, where the producer merges two computations *)
+   `gvn_merges` in ExamplesSsaANA5Test.v, where the producer merges two computations *)
 Record loop_info (N : Type) : Type := LoopInfo { header : N; body : N -> bool }.
 Record loop_info_wf {N E} (g : Graph.t N E) (lp : loop_info N) : Prop := {
   header_in_body : body lp (header lp) = true;
@@ -749,7 +750,7 @@ Definition optimise {K} (EK : encoding K) (rules : list (rewrite_rule K)) (cost 
     then Some u else None
   | None => None
   end.
-(* Acceptance evidence: `egraph_optimise_accepts`, a required Example in ExamplesSsaAnalyses.v on
+(* Acceptance evidence: `egraph_optimise_accepts`, a required Example in ExamplesSsaANA6Test.v on
    which `optimise` returns Some of a strictly cheaper term. *)
 ```
 
@@ -863,7 +864,7 @@ Definition nowrap_check {V} (w : width) (sg : signedness) (inv : V -> Z) (ch : c
     (bound : iexpr V) (t : N) : bool.
 (* separate evidence: eval ch k for every k <= t, and the bound, lie inside the range of w under
    sg, by interval arithmetic on the base, the step and t. Acceptance evidence:
-   `scev_count_up_trip`, a required Example in ExamplesSsaAnalyses.v *)
+   `scev_count_up_trip`, a required Example in ExamplesSsaANA7Test.v *)
 ```
 
 ### ANA-8: calls
@@ -1464,7 +1465,8 @@ Theorem sparse_of_numeric_laws {A K C} (ND : numeric_domain A) (G : concretisati
   sparse_domain_laws (sparse_of_numeric ND G br top) truth op_eval.
 (** Value analyses: constants, known bits, wrapping intervals and their reduced products are all
     sound on every client whose SSA view satisfies the laws. *)
-Theorem numeric_value_sound {S O N E V K C A} (m : semantics S O) (ND : numeric_domain A)
+Theorem numeric_value_sound {S O N E V K C A} (EN : encoding N) (EV : encoding V)
+    (m : semantics S O) (ND : numeric_domain A)
     (G : concretisation A word) (br : op_bridge K C) (top : A) (sv : ssa_view S O N E V K C)
     (vals : list V) (entry : V -> A) (sigma : sparse_unknown N E V -> lift_bot A) :
   ssa_view_laws m sv -> numeric_laws ND G -> op_bridge_laws br (op_eval sv) (truth sv) ->
@@ -1474,7 +1476,7 @@ Theorem numeric_value_sound {S O N E V K C A} (m : semantics S O) (ND : numeric_
      exists b i, def sv x = Param b i /\ In b (Graph.entries (cfg (base sv))) /\
        gamma (fact_conc (sparse_of_numeric ND G br top)) (entry x) c) ->
   post_solution (lift_bot_lattice (lat ND))
-    (sparse_system (numeric_problem ND G br top sv vals entry)) sigma ->
+    (sparse_system EN EV (numeric_problem ND G br top sv vals entry)) sigma ->
   forall s x c, reachable_state m s -> val sv s x = Some c ->
     gamma (lift_bot_gamma (fact_conc (sparse_of_numeric ND G br top))) (sigma (UVal x)) c.
 ```

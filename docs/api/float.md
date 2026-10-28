@@ -340,7 +340,7 @@ Theorem ssa_float_value_sound (P : program) (f : func) (vals : list vid) (entry 
        In b (Graph.entries (cfg (base (ssa_block_view fx P f)))) /\
        gamma fl_any_concretisation (entry x) c) ->
   post_solution (lift_bot_lattice fl_any_lattice)
-    (sparse_system (float_problem nm32 nm64 P f vals entry)) sigma ->
+    (sparse_system label_encoding var_encoding (float_problem nm32 nm64 P f vals entry)) sigma ->
   forall s x c, reachable_state (activation fx P f) s ->
     val (ssa_block_view fx P f) s x = Some c ->
     gamma (lift_bot_gamma fl_any_concretisation) (sigma (UVal x)) c.

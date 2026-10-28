@@ -8,7 +8,7 @@ A client supplies a graph and a sound transfer for each edge. For example, on th
 `x < 10`, an interval analysis can refine an unsigned `x` to `[0, 9]`; an impossible edge produces
 bottom. The library's intended solver returns a post-solution, and the view's soundness theorem
 connects that result to the client's semantics. This example describes the planned API; it is not
-executable in the current skeleton.
+yet an executable end-to-end client in this repository.
 
 Read [design](docs/design.md) for the architecture, [catalogue](docs/catalogue.md) for the scope,
 [trust](docs/trust.md) for evidence, and [workflow](docs/workflow.md) to build. The binding public
@@ -32,8 +32,13 @@ contracts are in [docs/api](docs/api/), with a [name index](docs/api/names.md). 
 
 ## Status
 
-The repository contains the build skeleton, API contracts, and initial Collections, Order and
-Bits implementations. Most analyses and proofs remain planned. The original skeleton passed a
-build check; the revised contracts have not been compiled as a whole. See
-[catalogue](docs/catalogue.md) for planned coverage and [trust](docs/trust.md) for the evidence
-behind each claim.
+At 2026-10-28 23:41 UTC, the landed foundations include Collections, Order and Bits, numeric and
+interval domain components, and the source and claims checking tool. Graph includes reachability,
+two dominance producers, SCCs, loops and colouring components. Fixpoint includes checking and
+fuel-bounded and total worklist solvers. Rewrite includes sorted syntax, e-graph rebuilding and
+pattern matching and client-defined class analyses. Rules syntax and basic semantic views are also
+present. Landed cards report kernel-checked claims and computed examples for their assigned
+contracts; they do not establish the whole library. Most analyses, later views and clients remain
+planned. The run ledger records
+the changing card status; see [catalogue](docs/catalogue.md) for scope and [trust](docs/trust.md)
+for the evidence. Contracts not yet implemented are specifications, not compiled interfaces.

@@ -228,7 +228,7 @@ Definition arrivals_since {E} (enter back : E -> bool) (es : list E) : nat :=
 Definition agreement_symmetric {A C} (R : agreement A C) : Prop :=
   forall a x y, agree R a x y -> agree R a y x.
 Definition agreement_swap {A C} (R : agreement A C) : agreement A C :=
-  Agreement (fun a x y => agree R a y x).
+  Agreement A C (fun a x y => agree R a y x).
 Record invariant_of {S O} (m : semantics S O) (inv : S -> Prop) : Prop := {
   inv_initial : forall s, initial m s -> inv s;
   inv_step : forall s l s', inv s -> step m s l s' -> inv s';
@@ -645,10 +645,10 @@ Record ssa_view_laws {S O N E V K C} (m : semantics S O) (sv : ssa_view S O N E 
      current values of their arguments: a block computes its comparison from the values it holds *)
   guard_op_defined : forall s l s' e, reachable_state m s -> step m s l s' ->
     taken (base sv) s l s' e -> guard_ops_consistent sv s e;
-  (* a value that gets a new binding is computed from the previous state, received along the
-     taken edge, or arbitrary *)
+  (* each present value is unchanged, computed from the previous state, received along the
+     taken edge, or arbitrary; this constructive alternative requires no equality decision on C *)
   value_origin : forall s l s' x c, reachable_state m s -> step m s l s' ->
-    val sv s' x = Some c -> val sv s x <> Some c ->
+    val sv s' x = Some c -> val sv s x = Some c \/
     (exists o args cs, def sv x = Op o args /\ Forall2 (fun y d => val sv s y = Some d) args cs
        /\ op_eval sv o cs = Some c) \/
     (exists e b i z, def sv x = Param b i /\ taken (base sv) s l s' e /\
@@ -708,7 +708,8 @@ Record sparse_problem (S O N E V K C A : Type) : Type := SparseProblem {
   sparse_values : list V;     (* every value that can be defined, each once *)
   entry_fact : V -> A         (* the fact for a parameter of an entry block *)
 }.
-Definition sparse_system {S O N E V K C A} (pr : sparse_problem S O N E V K C A) :
+Definition sparse_system {S O N E V K C A} (EN : encoding N) (EV : encoding V)
+    (pr : sparse_problem S O N E V K C A) :
   System.t (sparse_unknown N E V) (sparse_constraint N E V) (lift_bot A).
 (* One carrier, lift_bot A, serves values, edges and blocks; an edge or block is executable
    when its unknown is not Unreached. With g = cfg (base (view pr)) and D = domain pr, the
@@ -721,22 +722,23 @@ Definition sparse_system {S O N E V K C A} (pr : sparse_problem S O N E V K C A)
    CArbitrary x, def x = Arbitrary    UVal x            Reached (top_fact D)
    CArg e i, y = nth i (params (target e)),
      z = nth i (edge_args e)          UVal y            if UEdge e is executable then
-                                                        refine_on_edge pr s e z else Unreached
+                                                        refine_on_edge EV pr s e z else Unreached
    CEdge e                            UEdge e           Reached (top_fact D) if UBlock (source e)
-                                                        is executable and edge_feasible pr s e,
+                                                        is executable and edge_feasible EV pr s e,
                                                         else Unreached
    CBlock e                           UBlock (target e) s (UEdge e)
    The constraints list covers every x in `sparse_values pr`, every e in `edges_of g`, and every
-   i below the length of edge_args e. `Query.sides` is nil everywhere. *)
-Definition sparse_static {S O N E V K C A} (pr : sparse_problem S O N E V K C A) :
-  System.static (sparse_system pr).
+   i below the length of edge_args e. EN decides entry-block membership and EV decides value
+   identity in refinement. `Query.sides` is nil everywhere. *)
+Definition sparse_static {S O N E V K C A} (EN : encoding N) (EV : encoding V)
+    (pr : sparse_problem S O N E V K C A) : System.static (sparse_system EN EV pr).
 (* deps lists the unknowns each row reads, including those read by refine_on_edge and
    edge_feasible: the facts of the guard subjects of the edge and of their arguments *)
 ```
 
 ```coq
 (* ViewsRefine.v: argument refinement on edges and guard back-propagation. *)
-Definition refine_fact {S O N E V K C A} (pr : sparse_problem S O N E V K C A)
+Definition refine_fact {S O N E V K C A} (EV : encoding V) (pr : sparse_problem S O N E V K C A)
     (s : sparse_unknown N E V -> lift_bot A) (e : E) (z : V) (a0 : lift_bot A) : lift_bot A.
 (* If a0 is Unreached, or the fact of a value that a condition below reads is Unreached, the
    result is Unreached. Otherwise fold over edge_guard e in order, starting with a = a0 and, for
@@ -747,12 +749,14 @@ Definition refine_fact {S O N E V K C A} (pr : sparse_problem S O N E V K C A)
      a := nth j (assume_args D o b fs) a.
    The result is Reached a. The start fact is a parameter so that the fold of several edges can
    feed one result into the next. *)
-Definition refine_on_edge {S O N E V K C A} (pr : sparse_problem S O N E V K C A)
+Definition refine_on_edge {S O N E V K C A} (EV : encoding V)
+    (pr : sparse_problem S O N E V K C A)
     (s : sparse_unknown N E V -> lift_bot A) (e : E) (z : V) : lift_bot A :=
-  refine_fact pr s e z (s (UVal z)).
-Definition edge_feasible {S O N E V K C A} (pr : sparse_problem S O N E V K C A)
+  refine_fact EV pr s e z (s (UVal z)).
+Definition edge_feasible {S O N E V K C A} (EV : encoding V)
+    (pr : sparse_problem S O N E V K C A)
     (s : sparse_unknown N E V -> lift_bot A) (e : E) : bool.
-(* true iff for every condition cd in edge_guard e the fact refine_on_edge pr s e (subject cd)
+(* true iff for every condition cd in edge_guard e the fact refine_on_edge EV pr s e (subject cd)
    is Reached a with not (leb (fact_lat D) a (bot (fact_lat D))) *)
 ```
 
@@ -796,10 +800,10 @@ Definition dominating_edges_in {N E} (ctx : dom_context N E) (b : N) : list E :=
   dominating_edges (dc_prepared ctx) (dc_tree ctx) (dc_index ctx) b.
 (* The fact for z as read in block b: refine by every dominating edge, applying refinement at
    the read, with no extra nodes. The fold starts at the fact of z itself. *)
-Definition refined_fact {S O N E V K C A} (ctx : dom_context N E)
+Definition refined_fact {S O N E V K C A} (EV : encoding V) (ctx : dom_context N E)
     (pr : sparse_problem S O N E V K C A) (s : sparse_unknown N E V -> lift_bot A) (b : N)
     (z : V) : lift_bot A :=
-  fold_left (fun a e => refine_fact pr s e z a) (dominating_edges_in ctx b) (s (UVal z)).
+  fold_left (fun a e => refine_fact EV pr s e z a) (dominating_edges_in ctx b) (s (UVal z)).
 ```
 
 ### VIEW-6: effects, calls, call graph, summaries
@@ -1378,7 +1382,8 @@ Card: VIEW-3.
 (** Refining a fact by the guards of an edge is sound in a state in which the guards hold and the
     guard subjects are consistent with their operations, and whose values the facts contain:
     whatever fact the refinement starts from, if it contains the value of z, so does the result. *)
-Theorem refine_fact_sound {S O N E V K C A} (pr : sparse_problem S O N E V K C A)
+Theorem refine_fact_sound {S O N E V K C A} (EV : encoding V)
+    (pr : sparse_problem S O N E V K C A)
     (sigma : sparse_unknown N E V -> lift_bot A) (s : S) (e : E) (z : V) (a0 : lift_bot A)
     (c : C) :
   sparse_domain_laws (domain pr) (truth (view pr)) (op_eval (view pr)) ->
@@ -1388,9 +1393,10 @@ Theorem refine_fact_sound {S O N E V K C A} (pr : sparse_problem S O N E V K C A
      gamma (lift_bot_gamma (fact_conc (domain pr))) (sigma (UVal x)) d) ->
   val (view pr) s z = Some c ->
   gamma (lift_bot_gamma (fact_conc (domain pr))) a0 c ->
-  gamma (lift_bot_gamma (fact_conc (domain pr))) (refine_fact pr sigma e z a0) c.
+  gamma (lift_bot_gamma (fact_conc (domain pr))) (refine_fact EV pr sigma e z a0) c.
 (** The refinement that starts from the fact of z itself. *)
-Theorem refine_on_edge_sound {S O N E V K C A} (pr : sparse_problem S O N E V K C A)
+Theorem refine_on_edge_sound {S O N E V K C A} (EV : encoding V)
+    (pr : sparse_problem S O N E V K C A)
     (sigma : sparse_unknown N E V -> lift_bot A) (s : S) (e : E) (z : V) (c : C) :
   sparse_domain_laws (domain pr) (truth (view pr)) (op_eval (view pr)) ->
   Forall (cond_holds (view pr) s) (edge_guard (view pr) e) ->
@@ -1398,16 +1404,16 @@ Theorem refine_on_edge_sound {S O N E V K C A} (pr : sparse_problem S O N E V K 
   (forall x d, val (view pr) s x = Some d ->
      gamma (lift_bot_gamma (fact_conc (domain pr))) (sigma (UVal x)) d) ->
   val (view pr) s z = Some c ->
-  gamma (lift_bot_gamma (fact_conc (domain pr))) (refine_on_edge pr sigma e z) c.
+  gamma (lift_bot_gamma (fact_conc (domain pr))) (refine_on_edge EV pr sigma e z) c.
 (** A taken edge is feasible under the same premises. *)
-Theorem edge_feasible_sound {S O N E V K C A} (m : semantics S O)
+Theorem edge_feasible_sound {S O N E V K C A} (EV : encoding V) (m : semantics S O)
     (pr : sparse_problem S O N E V K C A) (sigma : sparse_unknown N E V -> lift_bot A) :
   ssa_view_laws m (view pr) ->
   sparse_domain_laws (domain pr) (truth (view pr)) (op_eval (view pr)) ->
   forall s l s' e, reachable_state m s -> step m s l s' -> taken (base (view pr)) s l s' e ->
     (forall x d, val (view pr) s x = Some d ->
        gamma (lift_bot_gamma (fact_conc (domain pr))) (sigma (UVal x)) d) ->
-    edge_feasible pr sigma e = true.
+    edge_feasible EV pr sigma e = true.
 ```
 Proof idea: fold over the conditions. `assume_value_sound` handles a condition on `z`; for a
 condition on a comparison `y` whose definition mentions `z`, `guard_ops_consistent` gives the
@@ -1423,7 +1429,8 @@ below bottom. Card: VIEW-4.
 (** Sparse conditional soundness: from a post-solution of the sparse system, every reachable
     state sits in an executable block, every taken edge is executable, and every defined value
     is in the concretisation of its fact. *)
-Theorem sparse_sound {S O N E V K C A} (m : semantics S O) (pr : sparse_problem S O N E V K C A)
+Theorem sparse_sound {S O N E V K C A} (EN : encoding N) (EV : encoding V)
+    (m : semantics S O) (pr : sparse_problem S O N E V K C A)
     (sigma : sparse_unknown N E V -> lift_bot A) :
   ssa_view_laws m (view pr) ->
   sparse_domain_laws (domain pr) (truth (view pr)) (op_eval (view pr)) ->
@@ -1431,7 +1438,7 @@ Theorem sparse_sound {S O N E V K C A} (m : semantics S O) (pr : sparse_problem 
   (forall s x c, initial m s -> val (view pr) s x = Some c ->
      exists b i, def (view pr) x = Param b i /\ In b (Graph.entries (cfg (base (view pr)))) /\
        gamma (fact_conc (domain pr)) (entry_fact pr x) c) ->
-  post_solution (lift_bot_lattice (fact_lat (domain pr))) (sparse_system pr) sigma ->
+  post_solution (lift_bot_lattice (fact_lat (domain pr))) (sparse_system EN EV pr) sigma ->
   (forall s, reachable_state m s ->
      executable (lift_bot_lattice (fact_lat (domain pr)))
        (sigma (UBlock (point (base (view pr)) s))) = true) /\
@@ -1440,7 +1447,8 @@ Theorem sparse_sound {S O N E V K C A} (m : semantics S O) (pr : sparse_problem 
   (forall s x c, reachable_state m s -> val (view pr) s x = Some c ->
      gamma (lift_bot_gamma (fact_conc (domain pr))) (sigma (UVal x)) c).
 ```
-Proof idea: induction on `exec` with the three-part invariant. A new binding is an operation (use
+Proof idea: induction on `exec` with the three-part invariant. An unchanged binding uses the
+induction hypothesis; a binding with an origin is an operation (use
 `op_sound`), a parameter (use the `CArg` row and `refine_on_edge_sound`, whose premises are
 `guards_ok` and `guard_op_defined` at the taken edge), or arbitrary (use `top_sound`); a taken edge
 is
@@ -1480,6 +1488,7 @@ Theorem dominating_edges_in_sound {N E} (EN : encoding N) (g : Graph.t N E) (b :
 (** On-demand refined fact: the fact for a value as read in a reachable state is sound, with
     refinement applied at the read and no extra nodes. *)
 Theorem refined_fact_sound {S O N E V K C A} (m : semantics S O) (EN : encoding N)
+    (EV : encoding V)
     (ctx : dom_context N E) (pr : sparse_problem S O N E V K C A)
     (sigma : sparse_unknown N E V -> lift_bot A) :
   ctx = make_dom_context EN (cfg (base (view pr))) ->
@@ -1490,14 +1499,16 @@ Theorem refined_fact_sound {S O N E V K C A} (m : semantics S O) (EN : encoding 
        gamma (lift_bot_gamma (fact_conc (domain pr))) (sigma (UVal x)) d) ->
     val (view pr) s z = Some c ->
     gamma (lift_bot_gamma (fact_conc (domain pr)))
-      (refined_fact ctx pr sigma (point (base (view pr)) s) z) c.
+      (refined_fact EV ctx pr sigma (point (base (view pr)) s) z) c.
 ```
 Proof idea: the first is Graph's `dominating_edges_sound` for the tree that `make_dom_context`
-builds, which is sound whether or not the checker accepted it. The second folds `refine_fact`
-over the dominating edges with the invariant that the accumulated fact contains `c`: each edge
-dominates the block of `s` (the first theorem, `cfg_wf` for `graph_wf`), so `dominated_guard_holds`
-gives its guards and equations at `s`, and `refine_fact_sound` applies with the accumulated fact
-as its start fact. The start of the fold contains `c` by the facts premise. Card: VIEW-5.
+builds, which is sound whether or not the checker accepted it. For the second, prove directly,
+or using a stronger helper, that every edge returned by the walk dominates the queried block
+under `graph_wf` alone, including graphs whose outgoing lists contain duplicates. Do not invoke
+the first theorem without its `NoDup` premise. Fold `refine_fact` over those edges with the
+invariant that the accumulated fact contains `c`: `dominated_guard_holds` gives the guards and
+equations at `s`, and `refine_fact_sound` applies with the accumulated fact as its start fact.
+The start of the fold contains `c` by the facts premise. Card: VIEW-5.
 
 ### VIEW-6
 

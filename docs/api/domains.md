@@ -207,7 +207,9 @@ Definition width_ok {P} (maxw : width) (t : tagged P) : Prop :=
 Definition capped {P} (maxw : width) : Type := { t : tagged P | width_ok maxw t }.
 Definition capped_lattice {P} (maxw : width) (plat : width -> lattice P) : lattice (@capped P maxw).
 Definition capped_height {P} (D : word_domain P) (maxw : width)
-  (H : forall w, monotone_height (plat D w)) : monotone_height (capped_lattice maxw (plat D)).
+  (laws : forall w, lattice_laws (plat D w))
+  (H : forall w, monotone_height (plat D w)) :
+  monotone_height (capped_lattice maxw (plat D)).
 Definition capped_wrank {P} (D : word_domain P) (maxw : width)
   (W : forall w, bounded_widening_rank (plat D w)) :
   bounded_widening_rank (capped_lattice maxw (plat D)).
@@ -336,8 +338,8 @@ tz(y)`
 bits are known 0, where `tz` counts the known-0 low bits, and no other bit is known; there is no
 general
 multiplication claim. Variable-amount shifts and rotations: the join over the amounts the known bits
-allow. `bvudiv`: the leading zeros of the dividend are kept only if some bit of the divisor is known
-1
+allow, using the factored algorithm below. `bvudiv`: the leading zeros of the dividend are kept only
+if some bit of the divisor is known 1
 (division by zero gives all ones), else Top. `bvurem`: the leading zeros of the dividend are kept.
 `bvsdiv bvsmod`: Top. `bvsrem`: Top, except that the sign bit is known 0 when the dividend's sign
 bit is
@@ -348,6 +350,29 @@ truncation
 and concatenation; invert `bvadd bvsub` with one known operand; `bveq` = 1 meets; `bvult bvule` use
 leading
 bits; every refinement is a meet with the old fact.
+
+For a well-formed same-width shift or rotation, let `w` be the positive operand width. Normalize
+both masks to `w` bits; if either operand has a contradictory bit, return bottom. Otherwise the
+allowed amounts are exactly the `w`-bit words with the amount's known-one bits set, known-zero bits
+clear, and all other bits independently selectable. Let `S(k, a)` be the exact constant-amount
+transfer for the operator, and `join` the tnum least upper bound. Start with `S(base, a)`, where
+`base` is the normalized known-one mask. For each selected unknown amount bit `i`, replace the
+accumulator `r` by `join r (S(2^i, r))`. The stages compose shifts by ordinary addition, with
+oversized shifts saturating, and rotations by addition modulo `w`. Constant transfers preserve
+these joins because every output bit is a copied input bit or a fixed fill bit. Prove this
+preservation and the stage invariant; the final fact is the exact join of the constant transfers
+over all allowed amounts, hence the best known-bits abstraction of their concrete results. This
+claim is specific to these operations, not to every arithmetic transfer.
+
+For shifts, select only unknown bits `i < ceil(log2 w)`. If any unknown higher bit can be set,
+also join the oversized result: all zeros for logical shifts, and the dividend sign fill for
+arithmetic right shift. The base may itself be oversized; handle that case without constructing
+an oversized intermediate integer. For rotations, select every unknown bit below `w`, using
+`2^i mod w` as the stage amount; update that residue by doubling modulo `w`. In particular,
+non-power-of-two widths cannot discard higher amount bits. The amount is wrapped to `w` bits as
+in `eval_op`; rotations reduce it modulo `w`. Widths are positive, so width zero is not a legal
+word width. Counts retain the above rule, including the wrapped result of `clz` and `ctz` on zero.
+Use binary fuel or a structurally bounded traversal, and prove the oversized and sign-fill cases.
 
 ### Wrapping intervals (`DomainsWrapped.v`, DOM-3)
 
@@ -1101,8 +1126,11 @@ End SymbolicLaws.
 ## Performance notes
 
 - Constants, signs, intervals and congruence arithmetic cost a constant number of `Z` operations per
-  transfer; known-bits transfers cost O(1) big-integer operations in the width; wrapped-interval
-  multiplication is a constant number of cases. `tagged_domain` adds one width comparison per join.
+  transfer. Known-bits transfers use O(1) big-integer operations except variable shifts, which use
+  O(1 + log w), and variable rotations, which use O(w), on O(w)-bit integers for operand width `w`.
+  This counts big-integer operations, not bit complexity; scalar shifts guard oversized amounts.
+  Wrapped-interval multiplication is a constant number of cases. `tagged_domain` adds one width
+  comparison per join.
 - `capped` carriers hold their proof in `Prop`: they extract to the bare payload. Ranks sum over
   widths
   up to the cap and occur only in proofs. A reduced product calls `reduce` after each transfer, join
