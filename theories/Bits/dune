@@ -2,4 +2,4 @@
  (name Gaulois.Bits)
  (package gaulois)
  (flags :standard -w +default)
- (theories Stdlib))
+ (theories Stdlib Gaulois.Collections))
