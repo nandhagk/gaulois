@@ -41,7 +41,7 @@ GRA-4a; GRA-4c needs GRA-3a; GRA-5 needs GRA-2b; GRA-6a needs GRA-1a; GRA-6b nee
 | `GraphDominators.v` | `dom_tree`, `chk_idom`, boundary checker, selector and exact trees | GRA-2f |
 | `GraphEdgeDominance.v` | `edge_dominates`, `edge_dom_index`, `dominating_edges` | GRA-2b |
 | `GraphPostDominators.v` | `post_dominates`, `post_dominator_tree` | GRA-2b |
-| `GraphScc.v` | iterative Tarjan: `scc_within`, `scc`, `condensation` | GRA-3a |
+| `GraphScc.v` | iterative Tarjan: `scc_within`, `scc`, `condensation`, `topological_order` | GRA-3a |
 | `GraphDag.v` | `topological_sort`, `max_paths` | GRA-3b |
 | `GraphChain.v` | `resolve`, `resolve_all` (forwarding chains) | GRA-3b |
 | `GraphReducible.v` | `back_edge`, `reducible`, `reducible_b` | GRA-4a |
@@ -373,6 +373,11 @@ Definition post_dominator_tree {V E} {EV : encoding V} {g : Graph.t V E} (p : pr
 ### GRA-3a: components and condensation
 
 ```coq
+Definition topological_order {V E} (g : Graph.t V E) (l : list V) : Prop :=
+  NoDup l /\ (forall v, In v l <-> In v (Graph.nodes g)) /\
+  forall e, In (Graph.source g e) (Graph.nodes g) -> In e (Graph.out g (Graph.source g e)) ->
+    before l (Graph.source g e) (Graph.target g e).
+
 Record scc_result (V : Type) : Type := SccResult {
   components : list (list V);            (* in Tarjan's emission order: after every component it reaches *)
   component_ids : list positive;         (* IDs in the same emission order *)
@@ -429,10 +434,6 @@ Definition condensation {V E} {EV : encoding V} {g : Graph.t V E} (p : prepared 
 ### GRA-3b: topological sort, maximum-weight paths, forwarding chains
 
 ```coq
-Definition topological_order {V E} (g : Graph.t V E) (l : list V) : Prop :=
-  NoDup l /\ (forall v, In v l <-> In v (Graph.nodes g)) /\
-  forall e, In (Graph.source g e) (Graph.nodes g) -> In e (Graph.out g (Graph.source g e)) ->
-    before l (Graph.source g e) (Graph.target g e).
 Definition topological_sort {V E} {EV : encoding V} {g : Graph.t V E} (p : prepared EV g) :
   option (list V).      (* rpo of dfs p FinSet.empty (Graph.nodes g); None if some edge retreats *)
 Definition path_weight {E} (w : E -> Z) (es : list E) : Z := fold_right (fun e acc => (w e + acc)%Z) 0%Z es.

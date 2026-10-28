@@ -609,7 +609,8 @@ Record erasure_laws {S O N E X Cv I} (pol : trap_policy) (m : semantics S O) (en
     taken (er_graph er) t l t1 e -> er_erased er e = true ->
     l = nil /\ (forall x, dlookup (er_demand er) t1 x = dlookup (er_demand er) t x) /\
     exists s1 l0, step m s l0 s1 /\ taken (dgraph (er_demand er)) s l0 s1 e;
-  (* the endings other than stuck agree at the demand *)
+  (* The three declared endings agree at the demand. Stuck matching follows from these and the
+     two-way lock-step matches, without a decision procedure for whether a state can step. *)
   er_ends : forall s t k, k <> EndStuck -> er_inv pol m en s -> reachable_state m' t ->
     point (er_graph er) t = point (dgraph (er_demand er)) s -> er_agree EX er d s t ->
     (ends_as m en k s <-> ends_as m' en' k t)
@@ -1590,7 +1591,8 @@ Theorem dce_sound {S O N E X Cv I H} (pol : trap_policy) (m : semantics S O) (en
 ```
 Proof idea: `agreement_simulation2` of Views, with the lattice `demand_lattice`, the agreement
 `fun _ => demand_agreement`, the solution `fun _ => d` (a post-solution of the backward system by
-`demand_closed`), the transfer `demand_transfer`, `inv1 := er_inv pol m en` restricted to the states
+`demand_closed`), the exit fact `fun _ => d`, the transfer `demand_transfer`,
+`inv1 := er_inv pol m en` restricted to the states
 reachable from `s0`, `inv2 := reachable_state m'`, and the measures constantly zero (`d_no_stays`
 and `er_no_stays` leave no stay, and every step is matched by one step, after the empty silent
 run). Under DropUnreadTraps the original is first restricted to the run from `s0`, whose reachable
@@ -1601,9 +1603,12 @@ only dead variables and keeps all others (`d_frame`), so the no-op step of `P'`
 (`er_nop_forth`) restores agreement at `d`: a needed variable is not defined, and agreement at the
 transfer `demand_transfer e d`, which is above `d` outside the defined variables, gives its equality
 (`agree_antitone`); a dead variable agrees trivially (`d_bot_agrees`). The other direction is
-`er_nop_back`, whose matching step of `P` is silent likewise. The two programs share the graph
-(`er_cfg`), so both steps reach one point (`taken_edge`). This is the statement that justifies
-deleting `z <- z + 1` in Pfenning's example. Card: ANA-4.
+`er_nop_back`, whose matching step of `P` is silent likewise. For stuck matching, use the
+two-way step matches to show that if one state cannot step, the other cannot step either;
+`er_ends` transfers the absence of the other three endings. The matching run is empty. This
+argument needs agreement at `d`, which the chosen exit fact supplies. The two programs share the
+graph (`er_cfg`), so both steps reach one point (`taken_edge`). This justifies deleting
+`z <- z + 1` in Pfenning's example. Card: ANA-4.
 
 ```coq
 (** ADCE marking: effects are kept, control dependences are kept, divergence is kept, and the
@@ -5057,7 +5062,13 @@ The proof must establish placement legality, extend the finite availability inva
 each projected edge, derive the local kept/insert/replace/phi cases and construct the macro
 target view on the original graph. Apply `agreement_simulation2` to the source and macro view;
 compose with `stuttering_same_behaviour` for the bounded administrative refinement to the real
-target. Equal events, endings including traps and resource stops, finite prefixes and divergence
+target. Supply both explicit stuck matches: `pre_local_endings` covers related boundary states,
+and `pre_local_progress` provides a step at each administrative state and a decreasing measure
+to construct a finite silent path to a boundary. Progress alone does not establish that the
+boundary is related to the required source state. Prove the matching relation and endpoint
+conditions for the same path, accounting for every nondeterministic administrative choice; if
+the existing local laws do not suffice, report the precise gap for an owner ruling.
+Equal events, endings including traps and resource stops, finite prefixes and divergence
 are required. A client may only discharge totality and resource neutrality with actual laws for
 its semantics; the placement proof itself cannot establish them. The local laws are proof
 obligations for a concrete client, not an implementation result.

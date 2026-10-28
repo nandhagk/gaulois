@@ -137,13 +137,13 @@ Record bisimulation {S1 S2 O} (m1 : semantics S1 O) (e1 : endings S1)
 (* A stuttering bisimulation between two semantics over the same events. Related states advance
    together; a program may take a silent step alone while its measure falls, and a step of one
    program is matched by a silent run and one step of the other. The measures bound the silent steps
-   a program may take alone, so a diverging run is matched by a diverging run. Endings other than
-   stuck are matched after a silent run; a stuck state is then matched too. *)
+   a program may take alone, so a diverging run is matched by a diverging run. Every ending,
+   including stuck, is explicitly matched after a silent run. *)
 Record stuttering {S1 S2 O} (m1 : semantics S1 O) (e1 : endings S1) (m2 : semantics S2 O)
     (e2 : endings S2) (R : S1 -> S2 -> Prop) (mu1 mu2 : S1 -> S2 -> nat) : Prop := {
-  st_ends_forth : forall s t k, k <> EndStuck -> R s t -> ends_as m1 e1 k s ->
+  st_ends_forth : forall s t k, R s t -> ends_as m1 e1 k s ->
     exists t1, exec m2 t nil t1 /\ ends_as m2 e2 k t1;
-  st_ends_back : forall s t k, k <> EndStuck -> R s t -> ends_as m2 e2 k t ->
+  st_ends_back : forall s t k, R s t -> ends_as m2 e2 k t ->
     exists s1, exec m1 s nil s1 /\ ends_as m1 e1 k s1;
   st_forth : forall s t l s', R s t -> step m1 s l s' ->
     (l = nil /\ R s' t /\ mu1 s' t < mu1 s t) \/
@@ -278,14 +278,14 @@ Definition forth_agrees {S O N E A} (ma mb : semantics S O) (gva gvb : graph_vie
     (l = nil /\ agree R (sigma (point gva s)) s' t /\ mua s' t < mua s t) \/
     (exists t1 t', exec mb t nil t1 /\ step mb t1 l t' /\ point gvb t' = point gva s' /\
        agree R (sigma (point gva s')) s' t')).
-(* The ending obligation for one direction: an ending of one state other than stuck is matched,
-   after a silent run, by the same ending of the other, when the states agree at the exit fact.
+(* The ending obligation for one direction: every ending of one state, including stuck, is
+   matched after a silent run by the same ending of the other when states agree at the exit fact.
    The obligation is per kind, so a pass that may delete a trap discharges the trap obligation of
    the original under the premise that no reachable state of the original is trapped. *)
 Definition ends_forth {S O N E A} (ma mb : semantics S O) (ea eb : endings S)
     (gva gvb : graph_view S O N E) (R : agreement A S) (inva invb : S -> Prop)
     (exitf : N -> A) : Prop :=
-  forall s t k, k <> EndStuck -> inva s -> invb t -> point gvb t = point gva s ->
+  forall s t k, inva s -> invb t -> point gvb t = point gva s ->
     agree R (exitf (point gva s)) s t -> ends_as ma ea k s ->
     exists t1, exec mb t nil t1 /\ ends_as mb eb k t1.
 (* Both directions. The roles swap, and the agreement is read the other way round. *)
@@ -988,10 +988,10 @@ stuttering bisimulation). For the second, finish and prefix are by induction on 
 program, generalising the related state: a step of the run is a stutter, which keeps the other
 state, or a match, whose silent run is prepended to the other program's run. Divergence after a
 prefix is by induction on the run to the prefix, then coinduction with an inner well-founded
-induction on the measure that skips the stutters before the first matched step. A stuck state is
-matched by following the other program through its stutters: the stuck state has no step that
-could match anything else, so every step of the other program is a stutter, the measure ends
-them, and the state they reach cannot be final, trapped or stopped by `st_ends_back`. Card: VIEW-1.
+induction on the measure that skips the stutters before the first matched step. At a finite run's
+endpoint, `st_ends_forth` or `st_ends_back` supplies the silent matching run and the same ending,
+including `EndStuck`. This explicit obligation avoids deciding whether a transition exists.
+Card: VIEW-1.
 
 ```coq
 (** Observable behaviour is symmetric and transitive, so it can be chained through a toy's
@@ -1220,8 +1220,9 @@ the backward inequality of the post-solution at `e` with `agree_antitone` weaken
 the point to the input fact of `e`, so `forth_agrees` applies and its matched state is related
 (`inv_step` along the silent run keeps `inv2`). The steps of the transform are classified by
 `gv2`, whose graph is `cfg gv1`, and the second half of `step_agrees2` is the same argument with
-the roles and the agreement swapped (`agreement_swap` keeps the laws). The endings use the seed
-`exitf n <= sigma n`; then `stuttering_same_behaviour`. Card: VIEW-1.
+the roles and the agreement swapped (`agreement_swap` keeps the laws). All four endings, including
+stuck, use the seed `exitf n <= sigma n` and the corresponding `ends_agree2` obligation; then
+`stuttering_same_behaviour`. Card: VIEW-1.
 
 ### VIEW-2
 

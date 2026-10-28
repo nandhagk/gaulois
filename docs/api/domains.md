@@ -290,8 +290,12 @@ the
 bounds (`min hi` under an and; the next power of two minus one over an or or xor; `2^w - 1 - hi` for
 not). Shifts by an amount interval below `w`: shifted bounds when in range. `bvudiv bvurem`: from
 the
-bounds when the divisor excludes zero, else also all ones (resp. the dividend). Signed operators:
-exact when every operand lies in one sign half. Comparisons: `1` or `0` when decided, else `[0, 1]`.
+bounds when the divisor excludes zero, else also all ones (resp. the dividend). Signed operators
+other than `bvsrem` and `bvsmod` are exact when every operand lies in one sign half. For `bvsrem`
+and `bvsmod`, use sound sign-aware bounds in that case; their result need not be the least interval
+hull. For example, 8-bit `[5, 5]` `bvsrem` `[2, 3]` may return `[0, 2]` although the least hull is
+`[1, 2]`. The total word semantics, including a zero divisor, remains covered by `word_laws`.
+Comparisons: `1` or `0` when decided, else `[0, 1]`.
 Extensions, `bvtrunc`, `bvconcat`, `bvite`: bound arithmetic or the join. Counts: `[0, w]`;
 rotations:
 the whole range. `assume`: a comparison with a known result refines both operands (`bvult` = 1:

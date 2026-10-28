@@ -646,13 +646,14 @@ Contract: [Float](float.md).
 - `tarjan_state`, `TarjanState` — Record and constructor; iterative Tarjan machine state.
 - `frames`, `disc`, `low`, `pending`, `clock`, `emitted` — fields; stacks, numbers and output.
 - `condensation` — Definition; component graph with original cross-component edges.
+- `topological_order` — Definition; topological ordering of graph nodes.
 - `scc_within_exact`, `scc_exact` — Theorems; component partitions and mutual reachability.
 - `scc_reverse_topological` — Theorem; components are emitted after those they reach.
 - `condensation_correct` — Theorem; condensation is a well-formed DAG with the specified edges.
 
 ### `GraphDag.v` — GRA-3b
 
-- `topological_order`, `topological_sort` — Definitions; topological ordering and its computation.
+- `topological_sort` — Definition; computation of a topological ordering.
 - `path_weight` — Definition; sum of edge weights along a path.
 - `dag_paths`, `DagPaths` — Record and constructor; maximum entry-path weights and witnesses.
 - `best`, `via` — fields; maximum weights and selected final edges.
@@ -1116,7 +1117,7 @@ Contract: [Examples](examples.md).
 - `bisimulation` — Record; lock-step matching of endings and steps in both directions.
 - `bisim_ends`, `bisim_forth`, `bisim_back` — Fields; ending and step matching obligations.
 - `stuttering` — Record; two-way matching with decreasing measures for unmatched silent steps.
-- `st_ends_forth`, `st_ends_back` — Fields; match non-stuck endings after silent runs.
+- `st_ends_forth`, `st_ends_back` — Fields; match all endings, including stuck, after silent runs.
 - `st_forth`, `st_back` — Fields; match steps or take a decreasing silent step.
 - `bisimilar_same_behaviour` — Theorem; bisimilar states have equal observable behaviour.
 - `stuttering_same_behaviour` — Theorem; stuttering-related states have equal behaviour.
@@ -1171,8 +1172,8 @@ Contract: [Examples](examples.md).
   reachability.
 - `step_agrees`, `ends_agree`, `agreeing` — Definitions; step, ending, and state agreement
   obligations.
-- `forth_agrees`, `ends_forth` — Definitions; one-direction step and ending matching
-  obligations.
+- `forth_agrees`, `ends_forth` — Definitions; one-direction step and all-ending matching
+  obligations, including stuck.
 - `step_agrees2`, `ends_agree2`, `agreeing2` — Definitions; two-program matching and
   related states.
 - `reachable_invariant` — Theorem; reachability satisfies `invariant_of`.
@@ -2938,6 +2939,7 @@ REW-7 owns the independent Order, SSA and word clients.
 - `DenseUniverse` — public declaration; see the owning API contract.
 - `dense_keys` — public declaration; see the owning API contract.
 - `dense_index` — public declaration; see the owning API contract.
+- `dense_length` — public declaration; see the owning API contract.
 - `dense_universe_wf` — public declaration; see the owning API contract.
 - `dense_prepare` — public declaration; see the owning API contract.
 - `dense_set` — public declaration; see the owning API contract.

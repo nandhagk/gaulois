@@ -12,14 +12,17 @@ same prepared universe and reject keys outside it by leaving the set unchanged.
 ```coq
 Record dense_universe (K : Type) : Type := DenseUniverse {
   dense_keys : list K;
-  dense_index : Map.t K N
+  dense_index : Map.t K N;
+  dense_length : N
 }.
 Definition dense_universe_wf {K} (E : encoding K) (u : dense_universe K) : Prop :=
   NoDup (dense_keys u) /\ Map.wf E (dense_index u) /\
+  dense_length u = N.of_nat (List.length (dense_keys u)) /\
   (forall k i, Map.get E k (dense_index u) = Some i <->
     nth_error (dense_keys u) (N.to_nat i) = Some k).
 Definition dense_prepare {K} (E : encoding K) (keys : list K) : dense_universe K.
-(* Keep the first occurrence of each key, in input order; construct dense_index once. *)
+(* Keep the first occurrence of each key, in input order; construct dense_index and
+   dense_length once. *)
 Definition dense_set := N.
 Definition dense_empty : dense_set := 0%N.
 Definition dense_mem {K} (E : encoding K) (u : dense_universe K) (k : K) (s : dense_set) : bool.
@@ -33,8 +36,9 @@ Definition dense_diff {K} (u : dense_universe K) (a b : dense_set) : dense_set.
 Definition dense_subset {K} (u : dense_universe K) (a b : dense_set) : bool.
 Definition dense_to_finset {K} (E : encoding K) (u : dense_universe K) (s : dense_set) : FinSet.t K.
 Definition dense_of_finset {K} (E : encoding K) (u : dense_universe K) (s : FinSet.t K) : dense_set.
-(* Bit i corresponds to nth_error (dense_keys u) i. Binary operations first mask to that length;
-   dense_to_finset enumerates dense_keys in order, retaining precisely its set bits. *)
+(* Bit i corresponds to nth_error (dense_keys u) i. Binary operations first mask to the cached
+   dense_length; dense_to_finset enumerates dense_keys in order, retaining precisely its set bits.
+   The length cache agrees with the keys when dense_universe_wf holds. *)
 
 Theorem dense_prepare_wf {K} (E : encoding K) (keys : list K) :
   dense_universe_wf E (dense_prepare E keys).
@@ -292,14 +296,16 @@ Definition PQueue.before (p1 c1 p2 c2 : positive) : Prop :=
 ```
 
 The specification is the finite map `key -> priority` that `PQueue.priority` reads and
-`PQueue.members` lists. Suggested representation: a persistent leftist heap of entries
-`(priority, code, key)`, a `Map.t K positive` of live priorities, and a counter. A push that
-lowers a priority inserts a new entry and leaves the old entry stale; `pop` discards an entry
+`PQueue.members` lists. Use a persistent rank-position binomial heap of entries
+`(priority, code, key)`, a `Map.t K positive` of live priorities, and cached live and pending
+entry counts. A push that lowers a priority inserts a new entry and leaves the old entry stale;
+`pop` discards an entry
 whose priority differs from the live one, including when its key is absent from the live map.
 `PQueue.wf` says the heap order holds, every entry's code is `encode E key`, the live map satisfies
-`Map.wf E`, every live key has an entry with its live priority, and the counter equals the number
-of live keys. Heap merge uses a nested `fix`; `pop` uses the heap entry count as fuel, decreasing it
-for each discarded entry.
+`Map.wf E`, every live key has an entry with its live priority, and the counters agree with the
+live keys and pending entries. Heap ranks are represented by position, so linking and merging do
+not compare rank values. `pop` uses the cached entry count as fuel, decreasing it for each
+discarded entry.
 
 ### Union-find (`CollectionsUnionFind.v`)
 
@@ -634,7 +640,7 @@ Theorem PQueue.size_push_new : PQueue.wf E q -> PQueue.priority E k q = None ->
 Theorem PQueue.size_push_old : PQueue.wf E q -> PQueue.priority E k q <> None ->
   PQueue.size (PQueue.push E p k q) = PQueue.size q.
 Theorem PQueue.wf_push : PQueue.wf E q -> PQueue.wf E (PQueue.push E p k q).
-(* Proof idea: leftist-heap insertion plus a live-map update; a lowering push adds one entry
+(* Proof idea: binomial-heap insertion plus a live-map update; a lowering push adds one entry
    and makes the old one stale. Card: COL-2. *)
 
 (** Pop fails exactly on an empty queue. *)
@@ -771,9 +777,9 @@ End TableLaws.
   first trie that follows the second trie only along the paths of the first.
 - **Encodings.** An injective code into `positive`, as `Countable` in std++ (Krebbers et al.);
   pairs and lists use a self-delimiting prefix code (doubled bits, then a delimiter).
-- **Priority queue.** A leftist heap (Crane 1972; Okasaki, *Purely Functional Data Structures*,
-  1998, ch. 3) ordered by `(priority, code)`. Lowering a priority uses lazy deletion: the old entry
-  stays in the heap and `pop` skips an entry that disagrees with the live map.
+- **Priority queue.** A rank-position binomial heap ordered by `(priority, code)`. Lowering a
+  priority uses lazy deletion: the old entry stays in the heap and `pop` skips an entry that
+  disagrees with the live map.
 - **Union-find.** Union by rank and path compression (Tarjan, "Efficiency of a good but not linear
   set union algorithm", JACM 1975; Tarjan and van Leeuwen, JACM 1984), made persistent with
   tries in place of arrays (compare Conchon and Filliâtre, "A persistent union-find data
@@ -802,10 +808,14 @@ End TableLaws.
 - `Map.get`, `set` and `remove` add one `encode`. Prepared index: `Map.wf`, with
   `Map.elements_sound` and `Map.elements_complete` as the agreement lemmas between the trie and the
   key view; `Map.code_get` is the same index read by position.
-- With `n` heap entries, `PQueue.push` takes O(log n) for the heap plus one live-map operation.
-  `pop` takes O((1 + d) log n) for heap work and O(1 + d) live-map operations when it discards `d`
-  stale entries, with fuel equal to the entry count. The queue is persistent, so no amortised bound
-  is claimed. Prepared index: the live map and counters, with `PQueue.members_spec` and
+- With `n` pending heap entries, `PQueue.push` takes O(log(2 + n)) structural heap work and
+  O(log(2 + n)) priority/code comparisons, plus a constant number of live-map operations. `pop`
+  takes O((1 + d) log(2 + n)) structural heap work and priority/code comparisons, and O(1 + d)
+  live-map operations when it discards `d` stale entries, with fuel equal to the entry count.
+  Structural work counts constructors and branches; comparison, encoding and live-map costs are
+  separate. A positive priority/code comparison may inspect O(bit lengths) bits.
+  These are per-call bounds, including on persistent branches, with no amortised bound claimed.
+  Prepared index: the live map and counters, with `PQueue.members_spec` and
   `PQueue.size_members` as the agreement lemmas.
 - `UnionFind.find` is O(log n) by the rank bound on a single call. Path compression pays off only
   when the client threads the returned structure; `equivb` returns it for that purpose.
