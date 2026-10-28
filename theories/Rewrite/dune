@@ -1,0 +1,5 @@
+(rocq.theory
+ (name Gaulois.Rewrite)
+ (package gaulois)
+ (flags :standard -w +default)
+ (theories Stdlib Gaulois.Collections))
