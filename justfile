@@ -17,9 +17,9 @@ build *targets:
 test *args:
     {{ capped }} dune build -j 2 @tests/default @examples/default @runtest "$@"
 
-# Check the source tree; for now this is the formatting check.
+# Check formatting, source hygiene, layout and kernel-reported theorem assumptions.
 check *args:
-    {{ capped }} dune build @fmt "$@"
+    {{ capped }} bash -c 'dune build -j 2 @fmt @theories/default @examples/default @tests/default tools/gaulois.exe "$@" && exec _build/default/tools/gaulois.exe check' -- "$@"
 
 # Format every source file in place.
 fmt:
