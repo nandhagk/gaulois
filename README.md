@@ -22,6 +22,7 @@ contracts are in [docs/api](docs/api/), with a [name index](docs/api/names.md). 
 | Graph | Graph algorithms, certificates and checkers |
 | Fixpoint | Constraint systems, solvers, checkers and replay |
 | Rules | Stratified Datalog compiled to constraint systems |
+| Rewrite | Generic sorted rewriting, e-graphs and directly proved bounded saturation |
 | Bits | Fixed-width word operations and expressions |
 | Domains | Numeric, demand, address and equality domains |
 | Views | Language semantics, graph, SSA, structured, call and memory adapters |
@@ -31,7 +32,8 @@ contracts are in [docs/api](docs/api/), with a [name index](docs/api/names.md). 
 
 ## Status
 
-The repository contains the build skeleton and API contracts. Analyses and their proofs are planned,
-not implemented. The skeleton has passed a build check; the contracts have been reviewed but have
-not been compiled as a whole. See [catalogue](docs/catalogue.md) for planned coverage and
-[trust](docs/trust.md) for what each kind of evidence establishes.
+The repository contains the build skeleton, API contracts, and initial Collections, Order and
+Bits implementations. Most analyses and proofs remain planned. The original skeleton passed a
+build check; the revised contracts have not been compiled as a whole. See
+[catalogue](docs/catalogue.md) for planned coverage and [trust](docs/trust.md) for the evidence
+behind each claim.

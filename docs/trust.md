@@ -5,8 +5,8 @@ proved theorem whose assumptions meet the policy below. A statement that compile
 it does not establish a proof. A smoke check reports an outcome on examples. An experiment reports
 measurements and does not prove a general complexity or soundness claim.
 
-The contracts have been reviewed; they have not been compiled as a whole. The empty skeleton's
-successful build is a smoke check of the setup, not evidence that the contracted theorems hold.
+The revised contracts have not been compiled as a whole. The original skeleton's successful
+build is a smoke check of the setup, not evidence that the contracted theorems hold.
 The implementation run checks each card's theorems and examples, and FINAL checks a fresh build.
 
 ## Assumptions
@@ -27,8 +27,10 @@ A solver's post-solution proof establishes its stated constraints under its hypo
 soundness also depends on the client's view laws. Verified checkers allow untrusted producers to
 supply candidates; acceptance is meaningful only under the checker's stated premises. Cards require
 nontrivial accepted examples or a suitable completeness theorem so that a checker is exercised.
-Checked narrowing retains the previous solution if a candidate fails. Dominator and WTO fallbacks
-preserve their specified soundness while a fallback may be less precise.
+Checked narrowing retains the previous solution if a candidate fails. Directly proved internal
+producers need their own closed correctness proofs; checkers remain available for external and
+cached candidates. Legacy MemorySSA byte preservation retains its stated stronger premises and
+requires a proved projection from the new version graph where applicable.
 
 The behaviour theorem distinguishes the effect policies: retaining traps supports the stated
 behaviour equality; deleting unread traps supports the contract's conditional refinement. Proofs

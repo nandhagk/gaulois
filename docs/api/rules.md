@@ -28,9 +28,13 @@ implicitly in constructors and projections (`Arguments` declarations are omitted
 | `RulesCompile.v` | `preds`, `constants`, `in_universe`, `herbrand` (proof-only), `relation`, `restrict`, `fire_rule`, `rconstraint`, `stratum_system`, `stratum_static`; `fire_rule_exact`, `stratum_system_monotone` | RUL-1a |
 | `RulesModel.v` | `derives`, `model_below`, `perfect_model`, `least_model`, `holds`; `least_model_closed` | RUL-1b |
 | `RulesSolve.v` | `solve_program`, `db_holds`, `represents`; stratum soundness and completeness, `solve_program_exact` | RUL-1b |
+| `RulesJoin.v` | selectable indexed and multiway joins with exact firing agreement | RUL-2a |
+| `RulesDelta.v` | semi-naive stratified solver and exact model agreement | RUL-2b |
 
 Prerequisites. RUL-1a needs FIX-1 and ORD-2. RUL-1b needs RUL-1a and FIX-2b (it uses
 `solve_total`, `solve_total_reached` and `solve_total_least`).
+RUL-2a needs RUL-1b; RUL-2b needs RUL-2a. The original solver remains available as a
+reference and for existing clients. The semi-naive solver is the primary production path.
 
 ## Definitions
 
@@ -210,6 +214,60 @@ Definition represents {P} (db : P -> FinSet.t tuple) (M : ground_atom P -> Prop)
   (forall p, FinSet.wf tuple_encoding (db p)) /\
   forall p ts, FinSet.mem tuple_encoding ts (db p) = true <-> M (p, ts).
 ```
+
+### Selectable joins and semi-naive solving
+
+```coq
+Inductive join_strategy : Type := IndexedNested | IndexedMultiway.
+
+Definition fire_rule_join {P} (strategy : join_strategy) (prog : program P)
+    (facts : list (ground_atom P)) (r : rule P) (env : P -> FinSet.t tuple) :
+    FinSet.t tuple.
+
+Definition solve_program_delta {P} (strategy : join_strategy) (prog : program P)
+    (facts : list (ground_atom P)) : option (database P).
+
+Theorem fire_rule_join_exact {P} (strategy : join_strategy) (prog : program P)
+    (facts : list (ground_atom P)) (r : rule P) (env : P -> FinSet.t tuple) :
+  program_wf prog facts -> In r (rules prog) -> env_wf prog env ->
+  forall ts, FinSet.mem tuple_encoding ts (fire_rule_join strategy prog facts r env) = true <->
+    FinSet.mem tuple_encoding ts (fire_rule prog facts r env) = true.
+
+Theorem fire_rule_join_wf {P} (strategy : join_strategy) (prog : program P)
+    (facts : list (ground_atom P)) (r : rule P) (env : P -> FinSet.t tuple) :
+  (forall p, FinSet.wf tuple_encoding (env p)) ->
+  FinSet.wf tuple_encoding (fire_rule_join strategy prog facts r env).
+
+Theorem solve_program_delta_exact {P} (strategy : join_strategy) (prog : program P)
+    (facts : list (ground_atom P)) :
+  program_wf prog facts -> (exists st, stratified prog st) ->
+  exists db, solve_program_delta strategy prog facts = Some db /\
+    represents (rel_of prog db) (least_model prog facts).
+
+Theorem solve_program_delta_none {P} (strategy : join_strategy) (prog : program P)
+    (facts : list (ground_atom P)) :
+  (forall st, ~ stratified prog st) -> solve_program_delta strategy prog facts = None.
+
+Theorem solve_program_delta_agrees {P} (strategy : join_strategy) (prog : program P)
+    (facts : list (ground_atom P)) (db delta : database P) :
+  program_wf prog facts -> solve_program prog facts = Some db ->
+  solve_program_delta strategy prog facts = Some delta ->
+  forall p ts, db_holds prog db p ts = db_holds prog delta p ts.
+```
+
+`IndexedNested` probes indexes for bound arguments; `IndexedMultiway` intersects indexed
+variable bindings. Prepare indexes once per input relation and maintain them when tuples are
+added. Both respect constants, repeated variables and arity; lower-stratum negation is tested
+only after that stratum is complete. Prove index lookup and join agreement independently of
+the implementation. Card: RUL-2a.
+
+For each stratum, retain accumulated and delta tuples. Fire recursive rule variants with at
+least one current delta, deduplicate candidates against accumulated tuples, and advance until
+all deltas are empty. Include facts and nonrecursive rules in initialization. Process strata in
+order; never evaluate negation against an unfinished lower relation. Prove each produced tuple
+derivable, every newly derivable tuple eventually produced, finite termination, and quiescent
+closure, then derive exact model correspondence and pointwise agreement. Each tuple is inserted
+once, but can participate in many joins; no linear running-time claim follows. Card: RUL-2b.
 
 ## Theorems
 

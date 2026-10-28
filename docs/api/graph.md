@@ -6,10 +6,9 @@ post-dominators, strongly connected components, loop forests, Bourdoncle's weak 
 dominance frontiers, control dependence and register colouring. Nothing assumes node ids: a node
 type supplies an `encoding`. For example, with entries `[1]` and edges `1→2`, `2→3`, `3→2`, the
 search visits `[1; 2; 3]`, `3→2` is a retreating edge, `2` dominates `3`, and the loop forest has
-one loop with header `2` and nodes `{2, 3}`. Every producer is total. A producer that can fail
-(the dominator tree, the weak topological order, the colouring) is judged by an exactness checker
-and falls back to a sound answer, so a theorem about its output is soundness always and exactness
-when the checker accepts.
+one loop with header `2` and nodes `{2, 3}`. Every producer is total. Dominator backends and the
+weak topological order have direct correctness proofs. Independent checkers remain available for
+external candidates; colouring also retains its checked fallback.
 
 Conventions of this document. The graph record is `Graph.t V E` in module `Graph`, with the
 projections `Graph.entries`, `Graph.nodes`, `Graph.out`, `Graph.source` and `Graph.target`, always
@@ -23,8 +22,10 @@ constructors and projections (`Arguments` declarations are omitted).
 
 ## Files
 
-Prerequisites: GRA-1a needs COL-1c; GRA-1b needs GRA-1a; GRA-2a needs GRA-1b; GRA-2b needs GRA-2a;
-GRA-3a needs GRA-1b; GRA-3b needs GRA-3a; GRA-4a needs GRA-2a and GRA-1b; GRA-4b needs GRA-3a and
+Prerequisites: GRA-1a needs COL-1c; GRA-1b needs GRA-1a; GRA-2a needs GRA-1b;
+GRA-2c needs GRA-2a; GRA-2d and GRA-2e need GRA-2c; GRA-2f needs GRA-2d and GRA-2e;
+GRA-2b needs GRA-2f; GRA-7 needs GRA-5 and GRA-2f;
+GRA-3a needs GRA-1b; GRA-3b needs GRA-3a; GRA-4a needs GRA-2f and GRA-1b; GRA-4b needs GRA-3a and
 GRA-4a; GRA-4c needs GRA-3a; GRA-5 needs GRA-2b; GRA-6a needs GRA-1a; GRA-6b needs GRA-6a.
 
 | File | Contents | Card |
@@ -33,7 +34,11 @@ GRA-4a; GRA-4c needs GRA-3a; GRA-5 needs GRA-2b; GRA-6a needs GRA-1a; GRA-6b nee
 | `GraphPrepare.v` | `prepared` (with `fuel`), `prepare`, `prepared_laws`, `ready`, `reverse_graph`, `prepared_reverse` | GRA-1a |
 | `GraphDfs.v` | `dfs`, `dfs_result`, `rpo`, `retreating`, tree ancestry, interval ancestry test | GRA-1b |
 | `GraphCertificate.v` | `check_path`, `tree_path` | GRA-1b |
-| `GraphDominators.v` | `dominates`, `dom_tree`, `chk_idom`, `check_idom`, `dom_tree_of`, `flat_tree`, `dominator_exact`, `dominator_tree`, `dominates_b` | GRA-2a |
+| `GraphDominance.v` | semantic dominance, `idom_ancestor`, `forest_on`, virtual-root reduction | GRA-2a |
+| `GraphSemiDominators.v` | shared DFS numbering, semidominators and link/eval proofs | GRA-2c |
+| `GraphLengauerTarjan.v` | `simple_lt_idom`, `simple_lt_idom_exact` | GRA-2d |
+| `GraphSemiNca.v` | `semi_nca_idom`, `semi_nca_idom_exact` | GRA-2e |
+| `GraphDominators.v` | `dom_tree`, `chk_idom`, boundary checker, selector and exact trees | GRA-2f |
 | `GraphEdgeDominance.v` | `edge_dominates`, `edge_dom_index`, `dominating_edges` | GRA-2b |
 | `GraphPostDominators.v` | `post_dominates`, `post_dominator_tree` | GRA-2b |
 | `GraphScc.v` | iterative Tarjan: `scc_within`, `scc`, `condensation` | GRA-3a |
@@ -44,6 +49,7 @@ GRA-4a; GRA-4c needs GRA-3a; GRA-5 needs GRA-2b; GRA-6a needs GRA-1a; GRA-6b nee
 | `GraphLoops.v` | `loop_forest`, `loop_forest_of` | GRA-4b |
 | `GraphWto.v` | `wto`, `wto_of`, `check_wto`, `wto_all_heads`, `wto_total` | GRA-4c |
 | `GraphFrontier.v` | `dominance_chain`, `dominance_frontier`, `iterated_frontier` | GRA-5 |
+| `GraphIdf.v` | `in_pruned_idf`, `direct_idf`, `direct_pruned_idf` | GRA-7 |
 | `GraphControlDependence.v` | `control_deps`, `cdep` | GRA-5 |
 | `GraphInterference.v` | `interference`, `add_point` (an observer step) | GRA-6a |
 | `GraphColour.v` | `greedy_colour`, `check_colouring`, `all_spilled` | GRA-6a |
@@ -196,7 +202,7 @@ Definition tree_path {V E} {EV : encoding V} {g : Graph.t V E} (p : prepared EV 
   (r : dfs_result V E) (v : V) : option (V * list E).
 ```
 
-### GRA-2a: the dominator tree
+### GRA-2a, GRA-2c–2f: the dominator tree
 
 `dominates` is semantic: every path from an entry to `n` passes through `d` (as its first node, or
 as the target of one of its edges). With several entries a node can have no strict dominator.
@@ -213,6 +219,67 @@ Definition immediately_dominates {V E} (g : Graph.t V E) (d n : V) : Prop :=
 The dominator tree is a forest: the roots are the reachable nodes with no strict dominator, and
 `idom` omits them.
 
+`GraphDominance.v` also supplies a fresh virtual root. The type `V + unit` keeps the root
+distinct from every client vertex; `E + V` keeps synthetic entry edges distinct from client
+edges. `virtual_entries` removes duplicate entries in first-occurrence order, using `EV`.
+
+```coq
+Definition virtual_entries {V E} (EV : encoding V) (g : Graph.t V E) : list V.
+Definition virtual_graph {V E} (EV : encoding V) (g : Graph.t V E) : Graph.t (V + unit) (E + V) :=
+  {| Graph.entries := [inr tt];
+     Graph.nodes := map (@inl V unit) (Graph.nodes g) ++ [inr tt];
+     Graph.out := fun v => match v with
+       | inl x => map (@inl E V) (Graph.out g x)
+       | inr _ => map (@inr E V) (virtual_entries EV g)
+       end;
+     Graph.source := fun e => match e with
+       | inl x => inl (Graph.source g x)
+       | inr _ => inr tt
+       end;
+     Graph.target := fun e => match e with
+       | inl x => inl (Graph.target g x)
+       | inr x => inl x
+       end |}.
+Definition virtual_encoding {V} (EV : encoding V) : encoding (V + unit) :=
+  sum_encoding EV unit_encoding.
+Definition virtual_prepared {V E} {EV : encoding V} {g : Graph.t V E}
+  (p : prepared EV g) : prepared (virtual_encoding EV) (virtual_graph EV g) :=
+  prepare (virtual_encoding EV) (virtual_graph EV g).
+```
+
+GRA-2c builds the shared semidominator map on that graph. A semidominator path has at least one
+edge; every internal vertex has a DFS preorder number strictly greater than the target's. The
+first and last vertices are excluded from that internal-vertex test. The semidominator is the
+candidate with least preorder number. The root and unreachable vertices have no map entry.
+
+```coq
+Definition semidom_path {V E} (EV : encoding V) (g : Graph.t V E)
+  (r : dfs_result V E) (u n : V) : Prop :=
+  exists es k h, es <> [] /\ path g u es n /\ Map.get EV n (pre_num r) = Some k /\
+    Map.get EV u (pre_num r) = Some h /\
+    forall pre e post, es = pre ++ e :: post -> post <> [] ->
+      exists j, Map.get EV (Graph.target g e) (pre_num r) = Some j /\ Pos.lt k j.
+Definition semidominator {V E} (EV : encoding V) (g : Graph.t V E)
+  (r : dfs_result V E) (u n : V) : Prop :=
+  semidom_path EV g r u n /\
+  exists k, Map.get EV u (pre_num r) = Some k /\
+    forall v, semidom_path EV g r v n ->
+      exists j, Map.get EV v (pre_num r) = Some j /\ Pos.le k j.
+Definition virtual_dfs {V E} {EV : encoding V} {g : Graph.t V E}
+  (p : prepared EV g) : dfs_result (V + unit) (E + V) :=
+  dfs (virtual_prepared p) FinSet.empty [inr tt].
+Definition semidominators {V E} {EV : encoding V} {g : Graph.t V E}
+  (p : prepared EV g) : Map.t (V + unit) (V + unit).
+```
+
+Compute semidominators in reverse DFS order using predecessor indexes and shared link/eval;
+both direct backends consume this same result. For each compressed link, the implementation
+maintains the minimum semidominator-rank label on the corresponding segment of the original
+uncompressed linked forest. `eval` returns a minimum on the queried linked path; compression
+preserves that fact for all subsequent queries. Prove the segment invariant, minimum query,
+rank-decreasing termination, semidominator path characterization and virtual-root path reduction
+before either backend proof. These proof helpers and the link/eval state are internal.
+
 ```coq
 Record dom_tree (V : Type) : Type := DomTree {
   idom : Map.t V V;                      (* parent in the forest; absent for a root *)
@@ -225,10 +292,17 @@ Definition idom_ancestor {V} (EV : encoding V) (m : Map.t V V) : V -> V -> Prop 
 Definition forest_on {V E} (EV : encoding V) (g : Graph.t V E) (m : Map.t V V) : Prop :=
   (forall v u, Map.get EV v m = Some u -> reachable g v /\ reachable g u) /\
   well_founded (fun u v => Map.get EV v m = Some u).
-Definition chk_idom {V E} {EV : encoding V} {g : Graph.t V E} (p : prepared EV g) : Map.t V V.
-(* Cooper-Harvey-Kennedy over rpo (dfs p FinSet.empty (Graph.entries g)): a root has the virtual root
-   as its parent and is left out of the map; intersect walks parent chains by post_num. Rounds run
-   until nothing changes, at most fuel p of them. Untrusted: check_idom judges it. *)
+Inductive dom_algorithm : Type := SimpleLT | SemiNCA.
+Definition simple_lt_idom {V E} {EV : encoding V} {g : Graph.t V E}
+  (p : prepared EV g) : Map.t V V.
+Definition semi_nca_idom {V E} {EV : encoding V} {g : Graph.t V E}
+  (p : prepared EV g) : Map.t V V.
+Definition chk_idom {V E} {EV : encoding V} {g : Graph.t V E}
+  (p : prepared EV g) : Map.t V V := simple_lt_idom p.
+(* The compatibility name is directly proved, not an unchecked CHK candidate. *)
+(* Both use one DFS on a fresh tagged virtual root, shared semidominators and link/eval.
+   Erase virtual-root parent bindings. LT settles buckets and corrects provisional parents;
+   Semi-NCA finds the nearest common ancestor of each semidominator and DFS parent. *)
 Definition dom_tree_of {V E} {EV : encoding V} {g : Graph.t V E} (p : prepared EV g)
   (m : Map.t V V) : dom_tree V.
 (* idom is m; tin and tout come from one DFS of the forest m, from the reachable nodes that have no
@@ -256,12 +330,15 @@ Definition flat_idom {V E} {EV : encoding V} {g : Graph.t V E} (p : prepared EV 
   end.
 Definition flat_tree {V E} {EV : encoding V} {g : Graph.t V E} (p : prepared EV g) : dom_tree V :=
   dom_tree_of p (flat_idom p).
-(* did the checker accept the Cooper-Harvey-Kennedy map? *)
+(* did the independent checker accept the directly constructed default map? *)
 Definition dominator_exact {V E} {EV : encoding V} {g : Graph.t V E} (p : prepared EV g) : bool :=
   check_idom p (chk_idom p).
-(* total: the checked map, else the flat tree; it is always sound, and exact when dominator_exact *)
+(* Explicit boundary query. Direct constructors do not call this expensive checker. *)
+Definition dominator_tree_with {V E} {EV : encoding V} {g : Graph.t V E}
+  (p : prepared EV g) (algorithm : dom_algorithm) : dom_tree V :=
+  dom_tree_of p (match algorithm with SimpleLT => simple_lt_idom p | SemiNCA => semi_nca_idom p end).
 Definition dominator_tree {V E} {EV : encoding V} {g : Graph.t V E} (p : prepared EV g) : dom_tree V :=
-  if dominator_exact p then dom_tree_of p (chk_idom p) else flat_tree p.
+  dominator_tree_with p SimpleLT.
 ```
 
 ### GRA-2b: edge dominance and post-dominators
@@ -483,15 +560,14 @@ Definition wto_of {V E} {EV : encoding V} {g : Graph.t V E} (p : prepared EV g) 
 (* Bourdoncle's recursion on node lists, from the reachable nodes in rpo: the components of
    scc_within p region in reverse emission order (a topological order of the condensation); a
    non-trivial component with header h, the first of its nodes in rpo, becomes WOpen h, the order
-   of its node list without h, then WClose; a trivial one becomes WVertex. Untrusted: check_wto
-   judges it. *)
+   of its node list without h, then WClose; a singleton with a self-loop also opens a component.
+   An acyclic singleton becomes WVertex. The producer is proved valid directly. *)
 (* the fallback in which every node is a head, nested: the vertices of order become heads in turn *)
 Definition wto_all_heads {V} (order : list V) : wto V :=
   map (fun h => WOpen h) order ++ repeat (WClose : wto_token V) (length order).
-(* total: the checked order, else the all-heads order over rpo (dfs p FinSet.empty (Graph.entries g)) *)
+(* total: the directly proved order; the checker and fallback remain boundary utilities *)
 Definition wto_total {V E} {EV : encoding V} {g : Graph.t V E} (p : prepared EV g) : wto V :=
-  let w := wto_of p in
-  if check_wto p w then w else wto_all_heads (rpo (dfs p FinSet.empty (Graph.entries g))).
+  wto_of p.
 ```
 
 ### GRA-5: frontiers and control dependence
@@ -511,6 +587,18 @@ Definition dominance_frontier {V E} {EV : encoding V} {g : Graph.t V E} (p : pre
    charged to the frontier it fills. Specified for an exact tree only *)
 Definition iterated_frontier {V E} {EV : encoding V} {g : Graph.t V E} (p : prepared EV g)
   (df : Map.t V (FinSet.t V)) (defs : list V) : FinSet.t V.      (* worklist over df with a seen set *)
+
+(* GraphIdf.v: direct single-query IDF, without materializing all frontiers. *)
+Inductive in_pruned_idf {V E} (g : Graph.t V E) (defs : list V) (live : V -> bool) : V -> Prop :=
+  | pruned_idf_step : forall d n, (In d defs \/ in_pruned_idf g defs live d) ->
+      in_df g d n -> live n = true -> in_pruned_idf g defs live n.
+Definition direct_idf {V E} {EV : encoding V} {g : Graph.t V E} (p : prepared EV g)
+  (t : dom_tree V) (defs : list V) : FinSet.t V.
+Definition direct_pruned_idf {V E} {EV : encoding V} {g : Graph.t V E} (p : prepared EV g)
+  (t : dom_tree V) (defs : list V) (live : V -> bool) : FinSet.t V.
+(* A dominator-tree priority worklist visits DJ edges and processes each discovered node once.
+   The pruned variant enqueues and emits only live nodes. Build indexes once; charge priority
+   operations, visited edges, encoding, and output separately. *)
 
 (* GraphControlDependence.v: edge e = (b -> s) makes n control dependent on b when n
    post-dominates s and does not strictly post-dominate b *)
@@ -732,23 +820,78 @@ Theorem dominates_iff_unreachable_without :
   dominates g d n <-> ~ reachable (without EV (FinSet.add EV d FinSet.empty) g) n.
 (* Proof idea: a path of g from an entry that avoids d, as start and as every target, is a path of the filtered graph and conversely. Card: GRA-2a. *)
 
+Theorem virtual_entries_exact : NoDup (virtual_entries EV g) /\
+  (forall v, In v (virtual_entries EV g) <-> In v (Graph.entries g)).
+(* Proof idea: a set-indexed first-occurrence traversal preserves membership and order.
+   Card: GRA-2a. *)
+Theorem virtual_graph_ready : ready EV g p ->
+  ready (virtual_encoding EV) (virtual_graph EV g) (virtual_prepared p).
+(* Proof idea: tagged constructors are disjoint and injective; virtual_entries_exact gives
+   unique synthetic edges and graph closure; apply prepare_ready. Card: GRA-2a. *)
+Theorem virtual_path_iff : ready EV g p -> forall s es n,
+  (path (virtual_graph EV g) (inr tt) (inr s :: map (@inl E V) es) (inl n) <->
+   In s (Graph.entries g) /\ path g s es n).
+(* Proof idea: invert the first synthetic edge, then induct on the original edge list.
+   Card: GRA-2a. *)
+Theorem virtual_dominates_iff : ready EV g p -> forall d n,
+  (dominates g d n <-> dominates (virtual_graph EV g) (inl d) (inl n)).
+(* Proof idea: every root-to-real-node path begins with one synthetic entry edge and otherwise
+   contains only original edges; translate both directions using virtual_path_iff. Card: GRA-2a. *)
+
+Theorem semidominators_wf : ready EV g p ->
+  Map.wf (virtual_encoding EV) (semidominators p).
+Theorem semidominators_exact : ready EV g p -> forall u n,
+  (Map.get (virtual_encoding EV) n (semidominators p) = Some u <->
+   reachable (virtual_graph EV g) n /\ n <> inr tt /\
+   semidominator (virtual_encoding EV) (virtual_graph EV g) (virtual_dfs p) u n).
+(* Proof idea: DFS numbering and the semidominator path characterization reduce every candidate
+   to a predecessor and a linked-tree minimum. Prove the compression segment invariant and
+   reverse-order induction, including root and unreachable omissions. Card: GRA-2c. *)
+
+Theorem simple_lt_idom_exact : ready EV g p ->
+  Map.wf EV (simple_lt_idom p) /\ forest_on EV g (simple_lt_idom p) /\
+  (forall d n, reachable g n ->
+    (dominates g d n <-> idom_ancestor EV (simple_lt_idom p) d n)).
+(* Proof idea: semidominator path characterization, link/eval minimum-label invariant, bucket
+   settlement and final parent correction; translate paths through the fresh virtual root.
+   Card: GRA-2d. *)
+Theorem semi_nca_idom_exact : ready EV g p ->
+  Map.wf EV (semi_nca_idom p) /\ forest_on EV g (semi_nca_idom p) /\
+  (forall d n, reachable g n ->
+    (dominates g d n <-> idom_ancestor EV (semi_nca_idom p) d n)).
+(* Proof idea: shared semidominator and link/eval invariants and the nearest-common-ancestor
+   theorem; the parent walk decreases DFS rank. Card: GRA-2e. *)
+Theorem dominator_tree_with_exact : ready EV g p -> forall algorithm,
+  (forall d n, reachable g n ->
+    (dominates_b EV (dominator_tree_with p algorithm) d n = true <-> dominates g d n)) /\
+  (forall d n, reachable g n ->
+    (Map.get EV n (idom (dominator_tree_with p algorithm)) = Some d <->
+     immediately_dominates g d n)) /\
+  (forall n, reachable g n ->
+    (Map.get EV n (idom (dominator_tree_with p algorithm)) = None <->
+     forall d, ~ strictly_dominates g d n)).
+(* Proof idea: apply the selected backend's exactness and forest numbering; strict dominators
+   form a chain. Card: GRA-2f. *)
+Theorem dominator_exact_true : ready EV g p -> dominator_exact p = true.
+(* Proof idea: simple_lt_idom_exact and check_idom_complete. Card: GRA-2f. *)
+
 (** The producer's map is well formed. *)
 Theorem chk_idom_wf : ready EV g p -> Map.wf EV (chk_idom p).
-(* Proof idea: chk_idom is built by Map.set from Map.empty; Map.wf_set. Card: GRA-2a. *)
+(* Proof idea: simple_lt_idom_exact. Card: GRA-2f. *)
 
 (** The checker decides exactness: an accepted map is a forest whose ancestry is dominance on every reachable node, and every such map is accepted. *)
 Theorem check_idom_sound : ready EV g p -> Map.wf EV m -> check_idom p m = true ->
   forest_on EV g m /\ forall d n, reachable g n -> (dominates g d n <-> idom_ancestor EV m d n).
-(* Proof idea: the numbering check gives the forest; dominates_iff_unreachable_without and dfs_exact for each blocked search give the iff for reachable d; an unreachable d dominates no reachable node and is no ancestor of one. Card: GRA-2a. *)
+(* Proof idea: the numbering check gives the forest; dominates_iff_unreachable_without and dfs_exact for each blocked search give the iff for reachable d; an unreachable d dominates no reachable node and is no ancestor of one. Card: GRA-2f. *)
 Theorem check_idom_complete : ready EV g p -> Map.wf EV m -> forest_on EV g m ->
   (forall d n, reachable g n -> (dominates g d n <-> idom_ancestor EV m d n)) -> check_idom p m = true.
-(* Proof idea: each test of the checker is an instance of the hypothesis, by the same two theorems read backwards; well-foundedness makes the numbering reach every key. Card: GRA-2a. *)
+(* Proof idea: each test of the checker is an instance of the hypothesis, by the same two theorems read backwards; well-foundedness makes the numbering reach every key. Card: GRA-2f. *)
 
 (** The numbering of a forest is the interval encoding of its ancestry on the reachable nodes. *)
 Theorem dom_tree_of_agrees : ready EV g p -> Map.wf EV m -> forest_on EV g m ->
   (forall n, (exists a, Map.get EV n (tin (dom_tree_of p m)) = Some a) <-> reachable g n) /\
   (forall d n, reachable g n -> (dominates_b EV (dom_tree_of p m) d n = true <-> idom_ancestor EV m d n)).
-(* Proof idea: the DFS of the forest visits every node below a root; intervals of a DFS nest exactly along ancestry (ancestor_b_agrees on the forest). Card: GRA-2a. *)
+(* Proof idea: the DFS of the forest visits every node below a root; intervals of a DFS nest exactly along ancestry (ancestor_b_agrees on the forest). Card: GRA-2f. *)
 
 (** The fallback is a forest: no parents, or the sole entry as the parent of every other reachable node. *)
 Theorem flat_idom_shape : ready EV g p ->
@@ -757,7 +900,7 @@ Theorem flat_idom_shape : ready EV g p ->
      forall n, Map.get EV n (flat_idom p) = Some s <-> (reachable g n /\ n <> s)) /\
   ((forall s', ~ (Graph.entries g <> [] /\ forall x, In x (Graph.entries g) -> x = s')) ->
      forall n, Map.get EV n (flat_idom p) = None).
-(* Proof idea: unfold the fold over the preorder (reachable_dfs): each key is a reachable non-entry with the entry as its parent, which is a root. Card: GRA-2a. *)
+(* Proof idea: unfold the fold over the preorder (reachable_dfs): each key is a reachable non-entry with the entry as its parent, which is a root. Card: GRA-2f. *)
 
 (** The total tree is always sound: it covers the reachable nodes, its ancestry and its interval test imply dominance, and each parent strictly dominates its child. *)
 Theorem dominator_tree_sound : ready EV g p ->
@@ -765,7 +908,7 @@ Theorem dominator_tree_sound : ready EV g p ->
   (forall d n, idom_ancestor EV (idom (dominator_tree p)) d n -> dominates g d n) /\
   (forall d n, dominates_b EV (dominator_tree p) d n = true -> dominates g d n) /\
   (forall n d, Map.get EV n (idom (dominator_tree p)) = Some d -> strictly_dominates g d n).
-(* Proof idea: case on dominator_exact. Accepted: chk_idom_wf, check_idom_sound and dom_tree_of_agrees. Rejected: flat_idom_shape, dom_tree_of_agrees, dominates_refl, and a sole entry dominates every reachable node. Card: GRA-2a. *)
+(* Proof idea: simple_lt_idom_exact, dom_tree_of_agrees and dominance reflexivity. Card: GRA-2f. *)
 
 (** When the checker accepted the map, the tree is exact: interval dominance is dominance, the parent of a node is its immediate dominator, and the roots have no strict dominator. *)
 Theorem dominator_tree_exact : ready EV g p -> dominator_exact p = true ->
@@ -774,7 +917,7 @@ Theorem dominator_tree_exact : ready EV g p -> dominator_exact p = true ->
      (Map.get EV n (idom (dominator_tree p)) = Some d <-> immediately_dominates g d n)) /\
   (forall n, reachable g n ->
      (Map.get EV n (idom (dominator_tree p)) = None <-> forall d, ~ strictly_dominates g d n)).
-(* Proof idea: check_idom_sound gives strict dominators = proper ancestors; they form a chain, whose last element is the parent, and a root has none. Card: GRA-2a. *)
+(* Proof idea: dominator_tree_with_exact for SimpleLT. Card: GRA-2f. *)
 End Gra2a.
 ```
 
@@ -994,9 +1137,14 @@ Theorem wto_valid_cycles : wto_valid g w -> forall v es, reachable g v -> es <> 
 Theorem wto_all_heads_valid : ready EV g p -> NoDup order -> (forall v, In v order <-> reachable g v) ->
   wto_valid g (wto_all_heads order).
 (* Proof idea: annotate gives the i-th node the stack of the heads up to itself, so an edge goes forward in the list or has its target among the heads before and including its source. Card: GRA-4c. *)
+(** The recursive SCC producer itself produces a valid order. *)
+Theorem wto_of_valid : ready EV g p -> wto_valid g (wto_of p).
+(* Proof idea: induct on the strictly decreasing region; SCC emission orders cross-component
+   edges forward, and removing the selected head encloses each remaining backward edge.
+   Card: GRA-4c. *)
 (** The total order is always valid. *)
 Theorem wto_total_valid : ready EV g p -> wto_valid g (wto_total p).
-(* Proof idea: an accepted order by check_wto_correct; otherwise the all-heads order over rpo, a NoDup listing of exactly the reachable nodes by dfs_exact, reachable_dfs and Permutation, with wto_all_heads_valid. Card: GRA-4c. *)
+(* Proof idea: wto_of_valid. Card: GRA-4c. *)
 End Gra4c.
 ```
 
@@ -1038,6 +1186,23 @@ Theorem control_deps_exact : ready EV g p -> incl exits (Graph.nodes g) -> exits
 (* Proof idea: dominance_chain on the reverse graph identifies the runner for each edge, and
    post_dominates_iff_reverse translates its witnesses to control dependence. Card: GRA-5. *)
 End Gra5.
+```
+
+### GRA-7: direct iterated-frontier queries
+
+```coq
+Section Gra7.
+Context {V E : Type} (EV : encoding V) (g : Graph.t V E) (p : prepared EV g).
+Variables (defs : list V) (live : V -> bool) (n : V).
+Theorem direct_idf_exact : ready EV g p ->
+  (FinSet.mem EV n (direct_idf p (dominator_tree p) defs) = true <-> in_idf g defs n).
+Theorem direct_pruned_idf_exact : ready EV g p ->
+  (FinSet.mem EV n (direct_pruned_idf p (dominator_tree p) defs live) = true <->
+   in_pruned_idf g defs live n).
+(* Proof idea: the DJ traversal discovers exactly the frontier of each processed definition;
+   induction over worklist steps and derivations proves soundness and least-closure completeness.
+   The pruning proof includes the live predicate on each derivation step. Card: GRA-7. *)
+End Gra7.
 ```
 
 ### GRA-6a
@@ -1107,12 +1272,9 @@ End Gra6b.
   forest classification. With several entries the roots form a forest, so an entry reached from an
   earlier one lies in that tree; `rpo_single_entry` is the single-entry statement, and dominance
   uses a virtual root above the roots.
-- **Dominators:** Cooper, Harvey and Kennedy, "A simple, fast dominance algorithm" (2001), over
-  `rpo` with a virtual root above the roots of the forest. Its output is judged by `check_idom`,
-  which needs only exact reachability; when the check fails the flat tree stands in, which is sound
-  but imprecise. No theorem says the producer succeeds: its precision is measured by examples, and a
-  client that needs exactness tests `dominator_exact`. A linear-time certificate (Lengauer-Tarjan,
-  1979, or a checkable semidominator witness) is future work.
+- **Dominators:** Lengauer and Tarjan (1979) simple LT and Georgiadis (2005) Semi-NCA share
+  DFS, semidominators and link/eval; each backend is directly proved exact. A fresh tagged virtual
+  root handles multiple entries. `check_idom` remains an independent boundary checker.
 - **Edge dominance:** an edge dominates a node `v` exactly when it is the only in-edge of `v` from
   a reachable node that `v` does not dominate; then it dominates what `v` dominates.
 - **Strongly connected components:** Tarjan 1972, with an explicit stack and lowlinks, stated as the
@@ -1134,24 +1296,26 @@ End Gra6b.
 
 ## Performance notes
 
-- `prepare` is one pass over `Graph.nodes g` and their edges, with map costs of O(log) per
-  operation; every later algorithm reads adjacency and predecessors by lookup in that index, and no
-  algorithm scans `Graph.nodes`, `Graph.entries` or an edge list inside a loop (the `before`, `In`
-  and `incl` forms appear in statements only). Every explicit-stack walk takes its fuel from
-  `fuel p`.
+- `prepare` is one pass over `Graph.nodes g` and their edges, with map costs of O(P) per
+  operation; every later algorithm reads adjacency and predecessors by lookup in that index.
+  Each adjacency list is traversed as required by the algorithm; do not repeatedly scan the full
+  graph or unrelated lists. The `before`, `In` and `incl` forms appear in statements only.
+  Prove a binary fuel bound for each traversal, including initialization and skipped roots.
 - Each prepared index has an agreement lemma: `out_index` with `succ_agrees`, `in_index` with
   `pred_agrees`, `fuel` with `fuel_value`, `pre_num` and `post_num` with `ancestor_b_agrees`,
   `tin` and `tout` with `dom_tree_of_agrees`, `edge_dom_index` with `edge_dominates_iff`,
   `comp_of` with `scc_within_exact`.
-- Linear in `V + E`, up to map costs: `dfs`, `rpo`, `scc`, `condensation`, `topological_sort`,
-  `max_paths`, `resolve_all` (each chain walked once), `check_wto`, `check_colouring`,
-  `dominance_frontier` (plus the size of the frontiers), `iterated_frontier`, `control_deps`.
-- `chk_idom` is O(V * E) worst case and near linear in practice. `check_idom` is O(V * (V + E)):
+- `dfs`, `rpo`, `scc`, `condensation`, `topological_sort`, `max_paths` and `resolve_all` take
+  O(V + E) graph operations plus map, key, weight and output costs. Frontier and control-dependence
+  runner walks cost O(V + E + visits), with up to O(VE) visits including repeated parallel edges.
+- `check_idom` is O(V * (V + E)) graph operations:
   one blocked search per reachable node, over the same prepared index. `dominates_b` and
   `ancestor_b` queries are O(1) interval tests plus map lookups.
 - `loop_forest_of` and `wto_of` are O((V + E) * d) for loop depth `d`, since each level is one
   `scc_within` call on a list; `natural_loop_nodes` is proportional to the loop and its incoming
-  edges, because the search starts at one node and stops at the header.
+  edges, because the search starts at one node and stops at the header. Materialized loop-node sets
+  can themselves contain Theta(Vd) memberships. Map operations cost O(P), where P is the encoded
+  key length, not necessarily O(log V); also count binary arithmetic, allocations and output.
 - Colouring keeps a degree-bucket map (`Map.t nat (FinSet.t V)`) for simplify and forbidden colours
   as a set per vertex; finding a free colour is O(k).
 
@@ -1160,9 +1324,8 @@ End Gra6b.
 1. **Edge equality.** `check_path` takes `eqE : E -> E -> bool` instead of an `encoding E`, so
    graphs with opaque edge types need no encoding; membership is a scan of one successor list,
    which is bounded by the out-degree of one node.
-2. **Precision of the total producers.** `dominator_tree` and `wto_total` are sound by theorem and
-   exact only when their checker accepts; whether the Cooper-Harvey-Kennedy and Bourdoncle
-   producers succeed on a graph is measured by examples and benchmarks, not claimed.
+2. **Direct producers.** The selected dominator backend and `wto_of` are directly proved; boundary
+   checkers remain useful for externally supplied candidates and differential examples.
 
 ## Cross-document contracts
 

@@ -26,9 +26,10 @@ The recipes run in `gaulois.slice` with a 1536 MiB default per-command memory ca
 `build` and `test` use two jobs. `just slice-cap` sets the shared slice cap to 9 GiB until reboot;
 `just slice-cap 4G` lowers it for a competing workload. The implementation runbook fixes stricter
 rules for agents, including one heavy command at a time and no override of the per-command cap.
-A fresh skeleton build can warn about empty dependency theories and still succeed.
+A build can warn about dependency theories that do not yet contain a `.v` file and still succeed.
 
-The setup's previous capped `nix develop --no-update-lock-file -c just build` succeeded. This
-records a
-skeleton smoke check, not a full implementation build. Run tests appropriate to each card and
-follow `run/RUNBOOK.md` for reviews, claims audits and landing.
+The setup's previous capped `nix develop --no-update-lock-file -c just build` succeeded on the
+original skeleton. That smoke check does not establish a full implementation build. Run tests
+appropriate to each card and follow `run/RUNBOOK.md` for reviews, claims audits and landing.
+Focused measurements may use the planned harness for a specific unresolved choice; benchmarks are
+not a completion gate.

@@ -33,8 +33,8 @@ those named as the acceptance evidence of a checker, which are required.
 | `ExamplesSsaEffects.v` | effects view and calls view with their laws | EX-5b |
 | `ExamplesSsaMemory.v` | the full-program graph and memory views | EX-6 |
 | `ExamplesSsaPointers.v` | pointer view, footprints, pointer and zero laws | ANA-9 |
-| `ExamplesSsaBytes.v` | byte view and byte laws | ANA-10 |
-| `ExamplesSsaAnalyses.v` | instantiation theorems and computed `Example`s, factorial included | EX-5a, ANA-3 to ANA-10 |
+| `ExamplesSsaBytes.v` | byte view and byte laws | ANA-10a |
+| `ExamplesSsaAnalyses.v` | instantiation theorems and computed `Example`s, factorial included | EX-5a, ANA-3 to ANA-9, ANA-10a, ANA-10e |
 
 ## Definitions
 
@@ -525,7 +525,7 @@ Definition ssa_ptr_view (ext : nat -> list cval -> option cval) (P : program) (l
 Definition ssa_footprints (P : program) : full_edge -> list (footprint vid).
 (* for an edge leaving an IAlloc, IStore, IFree or TCall, the range [0, 2^64) of every allocation
    site of P; nil elsewhere. These are the ranges for the zero facts of ANA-9. *)
-(* ExamplesSsaBytes.v. Card: ANA-10. *)
+(* ExamplesSsaBytes.v. Card: ANA-10a. *)
 Definition ssa_bytes_view (ext : nat -> list cval -> option cval) (P : program) (lim : limits) :
   bytes_view state event full_node full_edge vid nat.
 (* writes_at n: for an IAlloc, IStore, IFree or TCall at the node, the range [0, 2^64) of every
@@ -988,7 +988,7 @@ offset (`byte_frame`); `allocation_size_in_range` bounds each allocated block be
 allocation zero-fills its block and a block that exists is
 changed only by a store or a free, whose footprints cover it (`z_fresh`, `z_kept`; a freed block
 reads as no byte). Card: EX-6 for `ssa_full_view_laws` and `ssa_mem_laws`; ANA-9 for
-`ssa_ptr_laws` and `ssa_zero_laws`; ANA-10 for `ssa_bytes_laws`.
+`ssa_ptr_laws` and `ssa_zero_laws`; ANA-10a for `ssa_bytes_laws`.
 
 ```coq
 (** Instantiation theorems: each catalogue analysis is sound on Ssa. Every line is the
@@ -1108,7 +1108,7 @@ Theorem ssa_immutable_sound (ty : vid) (o : Z) :
   wf_program ext P -> (forall n, covered (writes_at bv n) ty o 1 -> False) ->
   forall s tr t l, reachable_state m s -> exec m s tr t -> bsite bv s l = Some ty ->
     byte bv t l o = byte bv s l o.
-(* immutable_sound, ssa_bytes_laws. Card: ANA-10. *)
+(* immutable_sound, ssa_bytes_laws. Card: ANA-10a. *)
 End SsaAnalysisWrappers.
 ```
 
@@ -1216,11 +1216,12 @@ Definition chain_writes_clobber : nat -> list (footprint nat).
 Definition chain_reads : nat -> list (footprint nat).     (* node 2: [Footprint 0 0 8]; else nil *)
 Definition chain_ssa : memory_ssa nat nat.                 (* the load at node 2 has def MDef 0 0 *)
 Example memoryssa_accepts :
-  no_clobber_check nat_encoding nat_encoding 0 chain_graph chain_writes chain_reads chain_ssa = true.
+  no_clobber_check nat_encoding nat_encoding nat_encoding 0
+    chain_graph chain_writes chain_reads chain_ssa = true.
 Example memoryssa_rejects :
-  no_clobber_check nat_encoding nat_encoding 0 chain_graph chain_writes_clobber chain_reads chain_ssa
-    = false.
-(* Card: ANA-10 for chain_graph, the chain footprints, chain_ssa and the two Examples. *)
+  no_clobber_check nat_encoding nat_encoding nat_encoding 0
+    chain_graph chain_writes_clobber chain_reads chain_ssa = false.
+(* Card: ANA-10e for chain_graph, the chain footprints, chain_ssa and the two Examples. *)
 ```
 
 ## Algorithms and references
@@ -1268,6 +1269,11 @@ Example memoryssa_rejects :
    sound for every program and as precise as their footprints.
 
 ## Requests to other documents
+
+The EX-5b effect and call laws concern the specified Ssa semantics under `wf_program ext P`.
+Its resolver covers modeled calls, and `ext` is the extension in that semantics. These proofs do
+not cover a host that adds unmodeled callbacks or heap effects. Such a host needs a new view and
+local step and effect laws, with unknown effects handled conservatively.
 
 1. **float.md** (FLT-1): `float_ext nm32 nm64` is the `ext` of every Ssa definition, and `Examples`
    now types the extension operators: a program that uses a float tag lists

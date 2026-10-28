@@ -49,6 +49,7 @@ Conventions used in every signature below:
 
 | File | Contents | Card |
 |---|---|---|
+| `ViewsSsaPoints.v` | finite instruction points, edge operands and syntactic liveness | VIEW-8 |
 | `ViewsSemantics.v` | endings, runs (`exec`, `exec_in`), divergence, behaviours, bisimulation and stuttering bisimulation between semantics | VIEW-1 |
 | `ViewsGraph.v` | graph view and its laws, dense forward and backward generators with their cut points, run histories | VIEW-1 |
 | `ViewsForward.v` | the forward-invariant theorems, over states and over histories | VIEW-1 |
@@ -63,6 +64,7 @@ Conventions used in every signature below:
 | `ViewsCalls.v` | calls view, resolver, call graph | VIEW-6 |
 | `ViewsSummary.v` | bottom-up summary engine and summary soundness over frames | VIEW-6 |
 | `ViewsMemory.v` | memory view, points-to soundness template | VIEW-7 |
+| `ViewsMemoryEffects.v` | ordered memory effects and execution correspondence | ANA-10b |
 
 ## Definitions
 
@@ -1648,8 +1650,259 @@ interval witness from `ptr_reach_sound` and shifts its bounds by the offset and 
 
 ## Cross-document contracts
 
+For VIEW-6, `functions` and `resolve` cover every frame actually pushed by the modeled semantics,
+including callbacks. An external operation modeled as one local step is covered by the local
+effects law; an external frame must be listed and resolved. An all-functions fallback is sound
+only for a closed set covering every possible pushed frame. Unknown effects use ANA-8c's
+`unknown_modref`, not an empty target list. The `local_covers` premise covers every reachable
+concrete step at the innermost function, including locally modeled external activity;
+`call_covers` lifts that step through each suspended call.
+
 Graph provides the total dominator tree, its sound edge index, `dominates_trans` and
 `reachable_in_nodes`. Domains provides bytewise `covered` and `footprint`. A pointer domain
 provides an inclusive start-offset witness; `access_footprint_sound` lifts it to covered bytes.
 Analyses and Examples use the names, skeleton edges, SSA laws and solution-relative premises
 defined here. EX-5c lifts activation reachability and traces, including callee events.
+
+
+<!-- C19 VIEW-8 contract -->
+
+## VIEW-8: finite instruction points
+
+`ViewsSsaPoints.v` defines the following. `B` and `BE` are block and block-edge identities;
+`N` and `E` are instruction-point and point-edge identities. A client constructs this view; no
+general SSA construction, destruction or repair is promised.
+
+```coq
+Record point_uses (N E V : Type) : Type := PointUses {
+  live_graph : Graph.t N E;
+  edge_use : E -> list V;
+  edge_def : E -> list V;
+  exit_use : N -> list V
+}.
+
+Inductive syntactic_live {N E V} (p : point_uses N E V) (x : V) : N -> Prop :=
+| live_exit : forall n, In x (exit_use p n) -> syntactic_live p x n
+| live_edge_use : forall n e, In e (Graph.out (live_graph p) n) ->
+    In x (edge_use p e) -> syntactic_live p x n
+| live_edge_next : forall n e, In e (Graph.out (live_graph p) n) ->
+    ~ In x (edge_def p e) -> syntactic_live p x (Graph.target (live_graph p) e) ->
+    syntactic_live p x n.
+
+Inductive point_chain {N E} (g : Graph.t N E) : list N -> list E -> Prop :=
+| point_chain_one : forall n, point_chain g [n] []
+| point_chain_step : forall n m ns e es,
+    In e (Graph.out g n) -> Graph.target g e = m ->
+    point_chain g (m :: ns) es -> point_chain g (n :: m :: ns) (e :: es).
+
+Record ssa_points (B BE N E V : Type) : Type := SsaPoints {
+  point_model : point_uses N E V;
+  block_graph : Graph.t B BE;
+  points_in_block : B -> list N;
+  instruction_edges : B -> list E;
+  parameter_edge : B -> E;
+  block_of_point : N -> B;
+  block_edge_of : E -> option BE;
+  block_params : B -> list V;
+  block_edge_args : BE -> list V;
+  point_definition : V -> option N
+}.
+
+Definition point_use_at {N E V} (p : point_uses N E V) (n : N) (x : V) : Prop :=
+  In x (exit_use p n) \/
+  exists e, In e (Graph.out (live_graph p) n) /\ In x (edge_use p e).
+
+Record ssa_point_laws {B BE N E V} (s : ssa_points B BE N E V) : Prop := {
+  points_graph_wf : graph_wf (live_graph (point_model s));
+  points_out_nodup : forall n, NoDup (Graph.out (live_graph (point_model s)) n);
+  blocks_graph_wf : graph_wf (block_graph s);
+  blocks_out_nodup : forall b, NoDup (Graph.out (block_graph s) b);
+  points_covered : forall n, In n (Graph.nodes (live_graph (point_model s))) <->
+    exists b, In b (Graph.nodes (block_graph s)) /\ In n (points_in_block s b);
+  points_unique : forall b, NoDup (points_in_block s b);
+  points_owner : forall b n, In b (Graph.nodes (block_graph s)) ->
+    In n (points_in_block s b) -> block_of_point s n = b;
+  blocks_nonempty : forall b, In b (Graph.nodes (block_graph s)) ->
+    points_in_block s b <> [];
+  points_ordered : forall b, In b (Graph.nodes (block_graph s)) ->
+    point_chain (live_graph (point_model s)) (points_in_block s b) (instruction_edges s b);
+  instruction_edges_internal : forall b e,
+    In b (Graph.nodes (block_graph s)) -> In e (instruction_edges s b) ->
+    block_edge_of s e = None;
+  instruction_edges_complete : forall n e,
+    In n (Graph.nodes (live_graph (point_model s))) ->
+    In e (Graph.out (live_graph (point_model s)) n) -> block_edge_of s e = None ->
+    In e (instruction_edges s (block_of_point s n));
+  parameter_edge_first : forall b, In b (Graph.nodes (block_graph s)) ->
+    nth_error (instruction_edges s b) 0 = Some (parameter_edge s b);
+  parameter_edge_defs : forall b x, In b (Graph.nodes (block_graph s)) ->
+    (In x (edge_def (point_model s) (parameter_edge s b)) <-> In x (block_params s b));
+  point_edge_projection : forall n e, In n (Graph.nodes (live_graph (point_model s))) ->
+    In e (Graph.out (live_graph (point_model s)) n) ->
+    match block_edge_of s e with
+    | None => block_of_point s n = block_of_point s (Graph.target (live_graph (point_model s)) e)
+    | Some be => In be (Graph.out (block_graph s) (block_of_point s n)) /\
+        Graph.target (block_graph s) be = block_of_point s (Graph.target (live_graph (point_model s)) e) /\
+        last (points_in_block s (block_of_point s n)) n = n /\
+        nth_error (points_in_block s (Graph.target (block_graph s) be)) 0 =
+          Some (Graph.target (live_graph (point_model s)) e)
+    end;
+  phi_args_length : forall be, In be (edges_of (block_graph s)) ->
+    length (block_edge_args s be) = length (block_params s (Graph.target (block_graph s) be));
+  phi_edge_use : forall n e be, In n (Graph.nodes (live_graph (point_model s))) ->
+    In e (Graph.out (live_graph (point_model s)) n) -> block_edge_of s e = Some be ->
+    forall x, In x (block_edge_args s be) -> In x (edge_use (point_model s) e);
+  block_edge_covered : forall be, In be (edges_of (block_graph s)) ->
+    exists n e, In n (Graph.nodes (live_graph (point_model s)) /\
+      In e (Graph.out (live_graph (point_model s)) n) /\ block_edge_of s e = Some be;
+  block_edge_unique : forall e1 e2 be,
+    In e1 (edges_of (live_graph (point_model s))) ->
+    In e2 (edges_of (live_graph (point_model s))) ->
+    block_edge_of s e1 = Some be -> block_edge_of s e2 = Some be -> e1 = e2
+}.
+
+Record reachable_point_ssa {B BE N E V} (s : ssa_points B BE N E V) : Prop := {
+  point_ssa_single_entry : exists entry, Graph.entries (live_graph (point_model s)) = [entry];
+  point_ssa_uses_defined : forall n x,
+    reachable (live_graph (point_model s)) n -> point_use_at (point_model s) n x ->
+    exists d, point_definition s x = Some d /\
+      reachable (live_graph (point_model s)) d /\
+      strictly_dominates (live_graph (point_model s)) d n;
+  point_ssa_defs_at_home : forall n e x,
+    reachable (live_graph (point_model s)) n ->
+    In e (Graph.out (live_graph (point_model s)) n) ->
+    In x (edge_def (point_model s) e) -> point_definition s x = Some n;
+  point_ssa_home_kills : forall x d e,
+    point_definition s x = Some d -> reachable (live_graph (point_model s)) d ->
+    In e (Graph.out (live_graph (point_model s)) d) -> In x (edge_def (point_model s) e)
+}.
+```
+
+Each `points_in_block` is the finite instruction-order list, including explicit before/after
+points. A block-edge point edge carries that occurrence's phi arguments, preserving
+parallel edges. A client's later common intra-block parameter-definition edge writes the block
+parameters; thus all incoming phi operands are read before the common static definition. The
+client additionally proves its point edges' uses and definitions agree with its instruction
+syntax and semantics; these are client-specific obligations rather than generic SSA laws.
+Exit uses include final, trap and stop operands. Unreachable nodes still have syntactic liveness;
+the strict record only restricts the reachable part. Definitions on a dynamic loop can execute
+more than once. An entry value is represented by a definition edge before its uses.
+
+
+
+
+<!-- C19 ANA-10b memory effects -->
+
+## Effects and the client boundary: ViewsMemoryEffects.v
+
+`MemoryAll` includes every byte of every object, including allocation and lifetime changes.
+`MemoryRegions fs` denotes the bytes covered by `fs`; a zero-width range covers no byte.
+Unknown calls use `MemoryAll` for both sides; a barrier is a read/write of `MemoryAll` and is
+never skipped solely because its footprint is empty. Call summaries must include all actual
+effects; exceptional or nonreturning calls need separate CFG edges for their actual transitions.
+The representation imposes no fixed machine word width or address-space bound.
+
+```coq
+Inductive memory_scope (T : Type) : Type :=
+  | MemoryRegions (fs : list (footprint T))
+  | MemoryAll.
+
+Definition memory_scope_covers {T} (scope : memory_scope T) (t : T) (o : Z) : Prop :=
+  match scope with
+  | MemoryRegions fs => covered fs t o 1
+  | MemoryAll => True
+  end.
+
+Inductive memory_effect (T : Type) : Type :=
+  | MemoryRead (reads : memory_scope T)
+  | MemoryWrite (writes : memory_scope T)
+  | MemoryReadWrite (reads writes : memory_scope T)
+  | MemoryCall (reads writes : memory_scope T)
+  | MemoryBarrier.
+
+Definition effect_reads {T} (a : memory_effect T) : memory_scope T :=
+  match a with
+  | MemoryRead r => r
+  | MemoryWrite _ => MemoryRegions []
+  | MemoryReadWrite r _ => r
+  | MemoryCall r _ => r
+  | MemoryBarrier => MemoryAll
+  end.
+
+Definition effect_writes {T} (a : memory_effect T) : memory_scope T :=
+  match a with
+  | MemoryRead _ => MemoryRegions []
+  | MemoryWrite w => w
+  | MemoryReadWrite _ w => w
+  | MemoryCall _ w => w
+  | MemoryBarrier => MemoryAll
+  end.
+
+Definition effect_is_def {T} (a : memory_effect T) : bool :=
+  match a with
+  | MemoryRead _ => false
+  | _ => true
+  end.
+
+Record memory_effect_view (S O N E T B L : Type) : Type := MemoryEffectView {
+  effect_graph : graph_view S O N E;
+  edge_effects : E -> list (memory_effect T);
+  effect_snapshot : S -> B;
+  effect_site : B -> L -> option T;
+  effect_byte : B -> L -> Z -> option nat;
+  effect_step : B -> memory_effect T -> B -> Prop;
+  effect_read : B -> memory_effect T -> L -> Z -> Prop;
+  transition_read : S -> list O -> S -> L -> Z -> Prop
+}.
+
+Inductive effect_trace {S O N E T B L}
+    (v : memory_effect_view S O N E T B L) : B -> list (memory_effect T) -> B -> Prop :=
+  | effect_trace_nil : forall b, effect_trace v b [] b
+  | effect_trace_cons : forall b a b' rest b'',
+      effect_step v b a b' -> effect_trace v b' rest b'' ->
+      effect_trace v b (a :: rest) b''.
+
+Inductive effect_trace_states {S O N E T B L}
+    (v : memory_effect_view S O N E T B L) :
+    B -> list (memory_effect T) -> list B -> B -> Prop :=
+  | effect_states_nil : forall b, effect_trace_states v b [] [] b
+  | effect_states_cons : forall b a b' rest states b'',
+      effect_step v b a b' -> effect_trace_states v b' rest states b'' ->
+      effect_trace_states v b (a :: rest) (b :: states) b''.
+
+Record memory_effect_laws {S O N E T B L} (m : semantics S O)
+    (v : memory_effect_view S O N E T B L) : Prop := {
+  effect_view_laws : graph_view_laws m (effect_graph v);
+  effect_no_stays : forall s tr s', ~ stays (effect_graph v) s tr s';
+  effect_step_trace : forall s tr s' e, reachable_state m s -> step m s tr s' ->
+    taken (effect_graph v) s tr s' e -> exists states,
+    effect_trace_states v (effect_snapshot v s) (edge_effects v e) states
+      (effect_snapshot v s') /\
+    forall l o, transition_read v s tr s' l o -> exists i b a,
+      nth_error states i = Some b /\ nth_error (edge_effects v e) i = Some a /\
+      effect_read v b a l o;
+  effect_read_covered : forall b a l o t, effect_read v b a l o ->
+    effect_site v b l = Some t -> memory_scope_covers (effect_reads a) t o;
+  effect_site_stable : forall b a b' l t, effect_step v b a b' ->
+    effect_site v b l = Some t -> effect_site v b' l = Some t;
+  effect_byte_frame : forall b a b' l t o, effect_step v b a b' ->
+    effect_site v b l = Some t -> effect_byte v b' l o <> effect_byte v b l o ->
+    memory_scope_covers (effect_writes a) t o
+}.
+
+Theorem effect_transition_byte_covered {S O N E T B L} (m : semantics S O)
+    (v : memory_effect_view S O N E T B L) :
+  memory_effect_laws m v ->
+  forall s tr s' e l t o, reachable_state m s -> step m s tr s' ->
+    taken (effect_graph v) s tr s' e -> effect_site v (effect_snapshot v s) l = Some t ->
+    effect_byte v (effect_snapshot v s') l o <> effect_byte v (effect_snapshot v s) l o ->
+    exists a, In a (edge_effects v e) /\ memory_scope_covers (effect_writes a) t o.
+```
+
+`transition_read` is the client's actual byte-read observation, including externally visible
+reads and reads performed by callees. Its connection to the client instruction semantics is an
+explicit client obligation. Intermediate `B` values are snapshots, not necessarily machine
+states; the event relation and its frame laws apply to every intermediate snapshot in a trace.
+The site is historical and remains after free; `effect_byte` can become `None` on free. Fresh
+allocation identities and actual read observations are supplied by the client. A later value
+forwarding theorem needs additional decoding, accessibility and equality laws.

@@ -1,5 +1,166 @@
 # Gaulois.Fixpoint
 
+## Nested WTO iteration (FIX-5)
+
+`FixpointNested.v` supplies a selectable directly proved nested iterator for static systems. It
+does not change `wto_scheduler`, which remains the static-priority queue scheduler of FIX-3.
+The two strategies can produce different widened post-solutions. Construct the dependency graph
+and `wto_total` once, using `unknowns`, `dependency_graph` and the graph preparation of FIX-3.
+Each target has a prebuilt list of its constraints in `System.constraints` order; do not scan the
+constraint list while iterating. The WTO token list is parsed once to a well-nested component
+tree with its heads, vertex-to-containing-components index, and ordered target constraint lists.
+
+An ordered pass visits each `WVertex` once. On `WOpen h`, it visits h, then each nested body item
+in order, repeating the whole component until no unknown in that component changed during the
+pass. Changes by side contributions count, even when their producing constraint targets another
+component; mark every containing component dirty. A complete outer pass traverses all top-level
+items and repeats until no unknown anywhere changes in that pass. Thus a side contribution to a
+previously visited component is not lost. On visiting x, run each constraint with target x once,
+in the prebuilt order, using `Query.run` once. Process its returned target value followed by all
+side contributions in `Query.run` order. An update is skipped when its contribution is already
+below the current value; otherwise use `widen` at a WTO head under `Widening`, and `join` at all
+other points or under `Joining`. Track changes through the same `leb` test used by
+`engine_step`. Constraints with no reads still run on every required visit. All target and side
+outputs are included in the graph and the component membership index.
+
+Each invocation uses binary fuel. One fuel unit performs one constraint evaluation, or one frame
+transition if no constraint is ready; it returns `None` if fuel expires before a no-change outer
+pass. The implementation uses explicit frames and a binary-recursive loop, not the Gallina call
+stack proportional to iteration count. Empty systems finish successfully. An initial assignment
+is everywhere bottom. A `None` result never certifies a solution. Definitions and theorems:
+
+```coq
+Definition nested_run {X C A} (EX : encoding X) (EC : encoding C) (L : lattice A)
+  (st : strategy) (S : System.t X C A) (SS : System.static S) (fuel : positive) :
+  option (assignment X A).
+Definition nested_solve_fuel {X C A} (EX : encoding X) (EC : encoding C)
+  (L : lattice A) (HL : lattice_laws L) (T : top L) (st : strategy)
+  (S : System.t X C A) (SS : System.static S) (fuel : positive) :
+  {s : X -> A | post_solution L S s}.
+(* Return the assignment from nested_run when it finishes, otherwise the everywhere-top function. *)
+Theorem nested_run_sound {X C A} (EX : encoding X) (EC : encoding C) (L : lattice A)
+  (HL : lattice_laws L) (st : strategy) (S : System.t X C A) (SS : System.static S)
+  (fuel : positive) (m : assignment X A) :
+  nested_run EX EC L st S SS fuel = Some m -> post_solution L S (lookup EX L m).
+Theorem nested_run_eventually {X C A} (EX : encoding X) (EC : encoding C) (L : lattice A)
+  (HL : lattice_laws L) (st : strategy) (S : System.t X C A) (SS : System.static S) :
+  terminates L SS (wto_scheduler EX S SS) st ->
+  exists fuel m, nested_run EX EC L st S SS fuel = Some m.
+```
+
+Proof obligations include component nesting, dirty propagation for every side target, termination
+of each pass, and a well-founded measure for the nested strategy. Prove that parsed heads are
+exactly the widening points of `wto_scheduler`, and that a complete outer pass evaluates every
+constraint, including those with side targets in earlier components. `nested_run_sound` follows
+from the final no-change pass, independently of leastness. `nested_run_eventually` needs finite
+height or the existing widening-rank and cycle-cut hypotheses; no leastness or schedule-independent
+equality is claimed. The independent full checker remains available for external candidates.
+Card: FIX-5.
+
+## Observation-oriented SCC iteration (FIX-6)
+
+`FixpointObserve.v` supplies a memory-conscious mode for static systems with no declared side
+targets. It returns selected observations; the full FIX-5 engine remains available for every
+static system including side effects. The fixed schedule first computes the SCCs of the declared
+read-to-target dependency graph in topological order. Within each SCC it uses the nested WTO
+iteration of FIX-5 on that component, initialized to bottom for its members and reading already
+stabilized predecessor values as immutable inputs. Build the induced component graph, its WTO,
+and the ordered target-constraint lists once. The induced WTO is computed deterministically from
+the component and is not an additional field supplied by the caller. No value is evicted during
+component stabilization.
+A component is complete only when its nested iterator finishes; a singleton without a self-edge
+is handled by the same rule. Side-free declarations guarantee that its constraints cannot update
+another component. Unknowns with no target constraint retain bottom.
+
+The plan stores the nonempty components in topological order, with each component represented by
+its first member, and indexes eviction lists by that representative. Prepare the index from the
+last component that declares a read of each value, counting the producer component itself. After
+a component stabilizes, record every selected observation in it, then remove each value whose
+last reader component is the just-completed component. Earlier external inputs remain available
+through every read in the current component. No scan of all unknowns or constraints occurs in
+the iteration. Observation keys must be among `unknowns`; duplicate keys are allowed. The result
+map contains exactly the distinct observation keys, including bottom-valued observations.
+
+The checker validates component coverage, membership, topological flow, the component WTOs,
+side-free declarations, observation coverage, and every lifetime against the declared read
+dependencies and the prepared system index. It rejects invalid plans and any declared side target.
+A component's schedule, constraint order and widening choices are the same in the two executions
+below. Both start with bottom values and a binary fuel budget. A fuel unit pays one nested frame
+transition or one constraint evaluation; bookkeeping and component-boundary eviction do not
+consume extra fuel. Both return `None` when the plan is invalid or fuel expires before all
+components stabilize. On completion both return the observation map. The full-memory reference
+keeps all stabilized values, while the memory-conscious execution performs the stated evictions.
+
+```coq
+Record observation_plan (X : Type) : Type := ObservationPlan {
+  observation_components : list (list X);
+  observation_expire : Map.t X (list X)
+}.
+Definition observation_prepare {X C A} (EX : encoding X) (S : System.t X C A)
+  (SS : System.static S) (ix : sys_index X C) (roots : list X) : option (observation_plan X).
+Definition observation_plan_check {X C A} (EX : encoding X) (S : System.t X C A)
+  (SS : System.static S) (ix : sys_index X C) (roots : list X) (p : observation_plan X) : bool.
+Definition observation_project {X A} (EX : encoding X) (L : lattice A) (roots : list X)
+  (m : assignment X A) : assignment X A.
+(* Fold Map.set over roots with the corresponding lookup EX L m value, starting from Map.empty. *)
+Definition observation_full_reference {X C A} (EX : encoding X) (L : lattice A) (st : strategy)
+  (S : System.t X C A) (SS : System.static S) (ix : sys_index X C) (roots : list X)
+  (p : observation_plan X) (fuel : positive) : option (assignment X A).
+(* The fixed-schedule execution without eviction, returning its complete assignment on success. *)
+Definition observation_reference {X C A} (EX : encoding X) (L : lattice A) (st : strategy)
+  (S : System.t X C A) (SS : System.static S) (ix : sys_index X C) (roots : list X)
+  (p : observation_plan X) (fuel : positive) : option (assignment X A).
+Definition observation_run {X C A} (EX : encoding X) (L : lattice A) (st : strategy)
+  (S : System.t X C A) (SS : System.static S) (ix : sys_index X C) (roots : list X)
+  (p : observation_plan X) (fuel : positive) : option (assignment X A).
+Theorem observation_prepare_checked {X C A} (EX : encoding X) (S : System.t X C A)
+  (SS : System.static S) (ix : sys_index X C) (roots : list X) (p : observation_plan X) :
+  sys_index_laws EX S SS ix -> observation_prepare EX S SS ix roots = Some p ->
+  observation_plan_check EX S SS ix roots p = true.
+Theorem observation_run_refines {X C A} (EX : encoding X) (L : lattice A) (st : strategy)
+  (S : System.t X C A) (SS : System.static S) (ix : sys_index X C) (roots : list X)
+  (p : observation_plan X) (fuel : positive) :
+  sys_index_laws EX S SS ix ->
+  observation_run EX L st S SS ix roots p fuel =
+    observation_reference EX L st S SS ix roots p fuel.
+Theorem observation_reference_projection {X C A} (EX : encoding X) (L : lattice A) (st : strategy)
+  (S : System.t X C A) (SS : System.static S) (ix : sys_index X C) (roots : list X)
+  (p : observation_plan X) (fuel : positive) :
+  observation_reference EX L st S SS ix roots p fuel =
+  option_map (observation_project EX L roots)
+    (observation_full_reference EX L st S SS ix roots p fuel).
+Theorem observation_full_reference_sound {X C A} (EX : encoding X) (L : lattice A)
+  (HL : lattice_laws L) (st : strategy) (S : System.t X C A) (SS : System.static S)
+  (ix : sys_index X C) (roots : list X) (p : observation_plan X) (fuel : positive)
+  (m : assignment X A) :
+  sys_index_laws EX S SS ix ->
+  observation_full_reference EX L st S SS ix roots p fuel = Some m ->
+  post_solution L S (lookup EX L m).
+Theorem observation_plan_complete {X C A} (EX : encoding X) (S : System.t X C A)
+  (SS : System.static S) (ix : sys_index X C) (roots : list X) :
+  sys_index_laws EX S SS ix ->
+  (forall c, In c (System.constraints S) -> side_targets SS c = []) ->
+  (forall x, In x roots -> In x (unknowns EX S SS)) ->
+  exists p, observation_prepare EX S SS ix roots = Some p.
+Theorem observation_run_eventually {X C A} (EX : encoding X) (L : lattice A)
+  (HL : lattice_laws L) (st : strategy) (S : System.t X C A) (SS : System.static S)
+  (ix : sys_index X C) (roots : list X) (p : observation_plan X) :
+  sys_index_laws EX S SS ix -> observation_plan_check EX S SS ix roots p = true ->
+  terminates L SS (wto_scheduler EX S SS) st ->
+  exists fuel m, observation_run EX L st S SS ix roots p fuel = Some m.
+```
+
+Prove the reference and optimized executions have identical component-local traces and widening
+histories. At each boundary they agree on all values read by a later component and on observations
+already recorded. `sides_within` proves that empty declared side lists exclude actual contributions.
+Prove that each derived local WTO's heads cut all cycles in its induced component, independently
+of the global scheduler's head set, and use this in the eventual-completion argument. The full
+reference's post-solution theorem establishes semantic utility; its projection and the refinement
+theorem connect that guarantee to the returned observations.
+The peak live assignment contains current-component values and earlier values with a later
+declared reader; the observation map is additional retained output. No eviction within an SCC,
+global memory-optimality claim, equality with a different schedule, or full-assignment result is
+promised. Card: FIX-6.
 Fixpoint gives every analysis one meaning: a constraint system. Each constraint has a target
 unknown and a right-hand side that is a small query tree: return a value, ask another unknown, or
 contribute to one. A result is a *post-solution* when every value returned and every value
@@ -51,6 +212,9 @@ Conventions of this document. Names are those of the anchors, as the rulings ame
 | `FixpointNarrow.v` | `narrow_pass`, `narrow_checked` | FIX-3 |
 | `FixpointPartial.v` | `closed_partial`, `check_partial` | FIX-4 |
 | `FixpointLocal.v` | `local_solve` (untrusted), `local_checked` | FIX-4 |
+| `FixpointNested.v` | nested WTO fuel iterator and direct soundness and termination | FIX-5 |
+| `FixpointObserve.v` | SCC observation iterator with validated value lifetimes | FIX-6 |
+| `FixpointLocalDirect.v` | directly proved static local closure and solver | FIX-7 |
 
 Prerequisites. FIX-2a needs FIX-1 and COL-2; FIX-2b needs FIX-2a and is the hard card (height,
 widening rank, widening points that cut every cycle); FIX-3 needs FIX-2b and GRA-3a, GRA-4b, GRA-4c;
@@ -441,6 +605,96 @@ Definition local_checked {X C A} (EX : encoding X) (EC : encoding C) (L : lattic
   | None => None
   end.
 ```
+
+### FIX-7: directly proved static local solving
+
+`FixpointLocalDirect.v` adds a trusted internal producer for finite static systems. It does not
+replace FIX-4's checker or claim to solve dynamic systems. Build the finite bipartite graph once:
+unknown x reaches each indexed constraint that has nominal target x or declares x as a side
+target; each such constraint reaches its nominal target, all declared side targets and all
+declared reads. Starting from the roots, visit each discovered unknown and constraint at most
+once using the existing encodings and indexed collections. Do not scan the constraints or the
+unknown universe inside the traversal. Its unknown set is `local_direct_closure`. Roots outside
+the system remain in the closure and have bottom values unless constrained.
+
+`local_direct_system` retains exactly the original constraints reached by this closure, in the
+original constraint-list order, and retains their original targets and query trees. It is built
+once; `local_direct_static` restricts the existing declarations to that system. Run the existing
+`solve_total` on the restricted system, then construct an assignment by storing the resulting
+value for each closure member. All other unknowns have the assignment's default bottom. The
+termination evidence supplied by the caller is for the restricted system and the selected
+scheduler and strategy. The producer never calls `check_partial` or gates its result on checker
+acceptance. No least-solution claim follows from these statements for weak joins or widening.
+
+```coq
+Definition local_direct_closure {X C A} (EX : encoding X) (EC : encoding C)
+  (S : System.t X C A) (SS : System.static S) (ix : sys_index X C) (roots : list X) : FinSet.t X.
+Definition local_direct_system {X C A} (EX : encoding X) (EC : encoding C)
+  (S : System.t X C A) (SS : System.static S) (ix : sys_index X C) (roots : list X) : System.t X C A.
+Definition local_direct_static {X C A} (EX : encoding X) (EC : encoding C)
+  (S : System.t X C A) (SS : System.static S) (ix : sys_index X C) (roots : list X) :
+  System.static (local_direct_system EX EC S SS ix roots).
+Definition local_direct {X C A} (EX : encoding X) (EC : encoding C) (L : lattice A)
+  (HL : lattice_laws L) (sch : scheduler X) (st : strategy) (S : System.t X C A)
+  (SS : System.static S) (ix : sys_index X C) (roots : list X)
+  (HT : terminates L (local_direct_static EX EC S SS ix roots) sch st) : local_result X A.
+
+Theorem local_direct_closure_wf {X C A} (EX : encoding X) (EC : encoding C)
+  (S : System.t X C A) (SS : System.static S) (ix : sys_index X C) (roots : list X) :
+  FinSet.wf EX (local_direct_closure EX EC S SS ix roots).
+Theorem local_direct_closure_roots {X C A} (EX : encoding X) (EC : encoding C)
+  (S : System.t X C A) (SS : System.static S) (ix : sys_index X C) (roots : list X) :
+  forall x, In x roots -> FinSet.mem EX x (local_direct_closure EX EC S SS ix roots) = true.
+Theorem local_direct_closure_least {X C A} (EX : encoding X) (EC : encoding C)
+  (S : System.t X C A) (SS : System.static S) (ix : sys_index X C) (roots : list X)
+  (E : FinSet.t X) :
+  FinSet.wf EX E -> (forall x, In x roots -> FinSet.mem EX x E = true) ->
+  (forall x c, FinSet.mem EX x E = true -> In c (contributors_of EX ix x) ->
+    FinSet.mem EX (System.target S c) E = true /\
+    (forall y, In y (side_targets SS c) -> FinSet.mem EX y E = true) /\
+    (forall y, In y (deps SS c) -> FinSet.mem EX y E = true)) ->
+  FinSet.subset EX (local_direct_closure EX EC S SS ix roots) E = true.
+Theorem local_direct_closure_complete {X C A} (EX : encoding X) (EC : encoding C)
+  (S : System.t X C A) (SS : System.static S) (ix : sys_index X C) (roots : list X) :
+  sys_index_laws EX S SS ix ->
+  forall c, In c (System.constraints S) ->
+    (FinSet.mem EX (System.target S c) (local_direct_closure EX EC S SS ix roots) = true \/
+     exists y, In y (side_targets SS c) /\
+       FinSet.mem EX y (local_direct_closure EX EC S SS ix roots) = true) ->
+    FinSet.mem EX (System.target S c) (local_direct_closure EX EC S SS ix roots) = true /\
+    (forall y, In y (side_targets SS c) ->
+      FinSet.mem EX y (local_direct_closure EX EC S SS ix roots) = true) /\
+    (forall y, In y (deps SS c) ->
+      FinSet.mem EX y (local_direct_closure EX EC S SS ix roots) = true).
+Theorem local_direct_system_constraints {X C A} (EX : encoding X) (EC : encoding C)
+  (S : System.t X C A) (SS : System.static S) (ix : sys_index X C) (roots : list X) (c : C) :
+  sys_index_laws EX S SS ix ->
+  (In c (System.constraints (local_direct_system EX EC S SS ix roots)) <->
+   In c (System.constraints S) /\
+   (FinSet.mem EX (System.target S c) (local_direct_closure EX EC S SS ix roots) = true \/
+    exists y, In y (side_targets SS c) /\
+      FinSet.mem EX y (local_direct_closure EX EC S SS ix roots) = true)).
+Theorem local_direct_roots {X C A} (EX : encoding X) (EC : encoding C) (L : lattice A)
+  (HL : lattice_laws L) (sch : scheduler X) (st : strategy) (S : System.t X C A)
+  (SS : System.static S) (ix : sys_index X C) (roots : list X)
+  (HT : terminates L (local_direct_static EX EC S SS ix roots) sch st) :
+  forall x, In x roots -> FinSet.mem EX x (explored (local_direct EX EC L HL sch st S SS ix roots HT)) = true.
+Theorem local_direct_closed {X C A} (EX : encoding X) (EC : encoding C) (L : lattice A)
+  (HL : lattice_laws L) (sch : scheduler X) (st : strategy) (S : System.t X C A)
+  (SS : System.static S) (ix : sys_index X C) (roots : list X)
+  (HT : terminates L (local_direct_static EX EC S SS ix roots) sch st) :
+  sys_index_laws EX S SS ix ->
+  let r := local_direct EX EC L HL sch st S SS ix roots HT in
+  closed_partial EX L S SS (explored r) (lookup EX L (values r)).
+```
+
+The closure is the least set containing roots and closed under these graph edges. Prove its
+termination from the finite discovered support, and prove the restricted constraints are exactly
+the reached constraints. The closure theorem and `reads_within` ensure that projecting the
+engine's function to a finite assignment preserves each activated query's reads, result and side
+contributions. Apply `solve_total`'s direct post-solution theorem to the restricted system and
+transfer it to `closed_partial`; no global functional extensionality or per-run checker is needed.
+Card: FIX-7.
 
 ## Theorems
 

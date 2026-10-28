@@ -1,5 +1,76 @@
 # Gaulois.Collections
 
+## Dense finite-universe set backend (COL-3)
+
+`CollectionsDenseSet.v` defines a separate set carrier for a fixed finite universe; it does not
+change `FinSet.t` or C4. Its bitset is a nonnegative `N`, and its operations ignore all bits at
+positions at or above the universe length. `universe` has no duplicate keys. Index lookup is built
+once as a `Map.t K N` and retains the exact positions in `universe`; no operation scans `universe`
+except conversion to a list or `FinSet` and initial index construction. All operations take the
+same prepared universe and reject keys outside it by leaving the set unchanged.
+
+```coq
+Record dense_universe (K : Type) : Type := DenseUniverse {
+  dense_keys : list K;
+  dense_index : Map.t K N
+}.
+Definition dense_universe_wf {K} (E : encoding K) (u : dense_universe K) : Prop :=
+  NoDup (dense_keys u) /\ Map.wf E (dense_index u) /\
+  (forall k i, Map.get E k (dense_index u) = Some i <->
+    nth_error (dense_keys u) (N.to_nat i) = Some k).
+Definition dense_prepare {K} (E : encoding K) (keys : list K) : dense_universe K.
+(* Keep the first occurrence of each key, in input order; construct dense_index once. *)
+Definition dense_set := N.
+Definition dense_empty : dense_set := 0%N.
+Definition dense_mem {K} (E : encoding K) (u : dense_universe K) (k : K) (s : dense_set) : bool.
+Definition dense_add {K} (E : encoding K) (u : dense_universe K) (k : K) (s : dense_set) :
+  dense_set.
+Definition dense_remove {K} (E : encoding K) (u : dense_universe K) (k : K) (s : dense_set) :
+  dense_set.
+Definition dense_union {K} (u : dense_universe K) (a b : dense_set) : dense_set.
+Definition dense_inter {K} (u : dense_universe K) (a b : dense_set) : dense_set.
+Definition dense_diff {K} (u : dense_universe K) (a b : dense_set) : dense_set.
+Definition dense_subset {K} (u : dense_universe K) (a b : dense_set) : bool.
+Definition dense_to_finset {K} (E : encoding K) (u : dense_universe K) (s : dense_set) : FinSet.t K.
+Definition dense_of_finset {K} (E : encoding K) (u : dense_universe K) (s : FinSet.t K) : dense_set.
+(* Bit i corresponds to nth_error (dense_keys u) i. Binary operations first mask to that length;
+   dense_to_finset enumerates dense_keys in order, retaining precisely its set bits. *)
+
+Theorem dense_prepare_wf {K} (E : encoding K) (keys : list K) :
+  dense_universe_wf E (dense_prepare E keys).
+Theorem dense_mem_refines {K} (E : encoding K) (u : dense_universe K) (s : dense_set) (k : K) :
+  dense_universe_wf E u ->
+  dense_mem E u k s = FinSet.mem E k (dense_to_finset E u s).
+Theorem dense_roundtrip {K} (E : encoding K) (u : dense_universe K) (s : FinSet.t K) (k : K) :
+  dense_universe_wf E u -> FinSet.wf E s ->
+  dense_mem E u k (dense_of_finset E u s) =
+    (FinSet.mem E k s && existsb (fun x => Pos.eqb (encode E x) (encode E k)) (dense_keys u)).
+Theorem dense_union_mem {K} (E : encoding K) (u : dense_universe K) (a b : dense_set) (k : K) :
+  dense_universe_wf E u -> dense_mem E u k (dense_union u a b) =
+    (dense_mem E u k a || dense_mem E u k b).
+Theorem dense_inter_mem {K} (E : encoding K) (u : dense_universe K) (a b : dense_set) (k : K) :
+  dense_universe_wf E u -> dense_mem E u k (dense_inter u a b) =
+    (dense_mem E u k a && dense_mem E u k b).
+Theorem dense_diff_mem {K} (E : encoding K) (u : dense_universe K) (a b : dense_set) (k : K) :
+  dense_universe_wf E u -> dense_mem E u k (dense_diff u a b) =
+    (dense_mem E u k a && negb (dense_mem E u k b)).
+Theorem dense_subset_spec {K} (E : encoding K) (u : dense_universe K) (a b : dense_set) :
+  dense_universe_wf E u ->
+  (dense_subset u a b = true <-> forall k, dense_mem E u k a = true -> dense_mem E u k b = true).
+Theorem dense_add_mem {K} (E : encoding K) (u : dense_universe K) (s : dense_set) (k x : K) :
+  dense_universe_wf E u -> dense_mem E u x (dense_add E u k s) =
+    (dense_mem E u x s ||
+      (Pos.eqb (encode E x) (encode E k) &&
+       existsb (fun y => Pos.eqb (encode E y) (encode E k)) (dense_keys u))).
+Theorem dense_remove_mem {K} (E : encoding K) (u : dense_universe K) (s : dense_set) (k x : K) :
+  dense_universe_wf E u -> dense_mem E u x (dense_remove E u k s) =
+    (dense_mem E u x s && negb (Pos.eqb (encode E x) (encode E k))).
+```
+
+The bounds on the bitset operations count arbitrary-precision bit operations, not machine-word
+O(1). Dense sets and FinSet have the same membership for keys in the prepared universe; they do
+not promise the same enumeration order. Card: COL-3.
+
 Collections provides the data structures every other package builds on: encodings that turn any
 key type into `positive`, canonical binary tries, maps and sets over encodable keys, a priority
 queue, a persistent union-find, and tables keyed by lists of numbers. A client never sees a trie;
@@ -31,6 +102,7 @@ by position, so that Order proves its lattice laws for every trie without a `wf`
 | `CollectionsHeap.v` | `PQueue`: min-priority queue with membership | COL-2 |
 | `CollectionsUnionFind.v` | `UnionFind`: persistent union-find, rank, path compression | COL-2 |
 | `CollectionsTable.v` | `Table`: maps keyed by `list positive`, as a flat `Map` | COL-2 |
+| `CollectionsDenseSet.v` | Prepared finite universes and packed set refinement | COL-3 |
 
 ## Definitions
 

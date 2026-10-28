@@ -9,7 +9,7 @@ uses. The contracts specify the intended interfaces; implementation status is in
 
 ```text
                          Analyses      Examples
-                     Views       Rules      Float
+                     Views    Rules    Rewrite    Float
                        Fixpoint    Domains
                      Graph  Order   Bits
                         Collections
@@ -31,10 +31,12 @@ contributions. Static systems over-approximate reads and contributions and suppo
 arguments, scheduling and cut-point checking. Dynamic systems use the full checker and fuel solver.
 A checked precision pass keeps its candidate only when the checker accepts it.
 
-Engines return a function with a post-solution proof. An independent verified checker also validates
-results. The local solver, e-graph saturation and MemorySSA construction are untrusted producers:
-their useful output depends on acceptance by the corresponding verified checker. Dominator and WTO
-producers have sound fallbacks if their checks fail; the dominator fallback can lose precision.
+Engines return a function with a post-solution proof. Directly proved internal dominance, WTO,
+rewriting and MemorySSA producers are planned alongside independent checkers for external or
+cached candidates. The legacy explanation checker remains the boundary for external replay;
+arbitrary narrowing and partial solutions retain their checked acceptance requirements. Selectable
+LT and Semi-NCA dominance implementations prove the same reachable dominance relation. Schedules
+with widening may produce different post-solutions.
 
 ## Views and clients
 

@@ -1,7 +1,8 @@
 # Public names
 
-Each entry gives its kind and meaning; the heading gives its owning file and card. The linked API
-document owns the full signature and statement. Internal representations are not public names.
+Each entry identifies a public name; the heading gives its owning file and card. Earlier entries
+also summarize kind and meaning. The linked API document owns the full signature and statement.
+Internal representations are not public names.
 
 ## Collections
 
@@ -580,23 +581,43 @@ Contract: [Float](float.md).
 - `check_path_correct`, `tree_path_valid` — Theorems; path checking and recovered paths are
   correct.
 
-### `GraphDominators.v` — GRA-2a
+### `GraphDominance.v` — GRA-2a
 
 - `dominates`, `strictly_dominates`, `immediately_dominates` — Definitions; semantic dominators.
+- `idom_ancestor`, `forest_on` — Definitions; parent-map ancestry and forest well-formedness.
+- `virtual_entries`, `virtual_graph`, `virtual_encoding`, `virtual_prepared` — virtual-root model.
+- `dominates_refl`, `dominates_trans`, `dominates_iff_unreachable_without` — dominance laws.
+- `virtual_entries_exact`, `virtual_graph_ready`, `virtual_path_iff`, `virtual_dominates_iff` —
+  virtual-root reduction laws.
+
+### `GraphSemiDominators.v` — GRA-2c
+
+- `semidom_path`, `semidominator`, `virtual_dfs`, `semidominators` — shared DFS and semidominators.
+- `semidominators_wf`, `semidominators_exact` — well-formedness and semantic characterization.
+
+### `GraphLengauerTarjan.v` — GRA-2d
+
+- `simple_lt_idom`, `simple_lt_idom_exact` — Lengauer–Tarjan producer and exactness.
+
+### `GraphSemiNca.v` — GRA-2e
+
+- `semi_nca_idom`, `semi_nca_idom_exact` — Semi-NCA producer and exactness.
+
+### `GraphDominators.v` — GRA-2f
+
 - `dom_tree`, `DomTree` — Record and constructor; dominator forest with ancestry intervals.
 - `idom`, `tin`, `tout` — fields; immediate dominators and forest traversal intervals.
-- `idom_ancestor`, `forest_on` — Definitions; parent-map ancestry and forest well-formedness.
+- `dom_algorithm`, `SimpleLT`, `SemiNCA`, `dominator_tree_with` — selectable direct backends.
 - `chk_idom`, `check_idom` — Definitions; candidate immediate dominators and exactness checker.
 - `dom_tree_of`, `dominates_b` — Definitions; number a parent forest and test ancestry by
   intervals.
 - `flat_idom`, `flat_tree` — Definitions; conservative fallback parent map and tree.
 - `dominator_exact`, `dominator_tree` — Definitions; checker acceptance and total checked tree.
-- `dominates_refl`, `dominates_trans` — Theorems; dominance is reflexive and transitive.
-- `dominates_iff_unreachable_without` — Theorem; dominance corresponds to blocked reachability.
 - `chk_idom_wf`, `check_idom_sound`, `check_idom_complete` — Theorems; candidate and checker laws.
 - `dom_tree_of_agrees`, `flat_idom_shape` — Theorems; forest intervals and fallback shape.
 - `dominator_tree_sound`, `dominator_tree_exact` — Theorems; total-tree soundness and checked
   exactness.
+- `dominator_tree_with_exact`, `dominator_exact_true` — selectable-tree and producer exactness.
 
 ### `GraphEdgeDominance.v` — GRA-2b
 
@@ -670,6 +691,8 @@ Contract: [Float](float.md).
 
 ### `GraphWto.v` — GRA-4c
 
+- `wto_of_valid` — Theorem; the direct WTO producer returns a valid order.
+
 - `wto_token`, `WVertex`, `WOpen`, `WClose` — Inductive and constructors; weak-order tokens.
 - `wto` — Definition; flat list of weak-order tokens.
 - `balanced_from`, `annotate` — Fixpoints; check nesting and attach enclosing-head stacks.
@@ -686,6 +709,11 @@ Contract: [Float](float.md).
 - `dominance_frontier`, `iterated_frontier` — Definitions; compute frontiers and their closure.
 - `dominance_chain` — Theorem; a runner chain identifies an edge's frontier witnesses.
 - `dominance_frontier_exact`, `iterated_frontier_exact` — Theorems; computed frontiers are exact.
+
+### `GraphIdf.v` — GRA-7
+
+- `in_pruned_idf`, `pruned_idf_step`, `direct_idf`, `direct_pruned_idf` — iterated frontiers.
+- `direct_idf_exact`, `direct_pruned_idf_exact` — exactness of both queries.
 
 ### `GraphControlDependence.v` — GRA-5
 
@@ -1013,7 +1041,7 @@ Contract: [Examples](examples.md).
   footprints.
 - `ssa_ptr_laws`, `ssa_zero_laws` — Theorems; pointer and zero-fact adapter laws.
 
-### `ExamplesSsaBytes.v` — ANA-10
+### `ExamplesSsaBytes.v` — ANA-10a
 
 - `ssa_bytes_view` — Definition; byte view and coarse write ranges.
 - `ssa_bytes_laws` — Theorem; byte view laws.
@@ -1033,7 +1061,7 @@ Contract: [Examples](examples.md).
 - `while_z_live`, `while_z_dead`, `while_dce_factorial`, `while_lcm_accepts` — Examples;
   EX-4 computed liveness, erasure and code-motion checks.
 
-### `ExamplesSsaAnalyses.v` — EX-5a, ANA-3, ANA-5 to ANA-10
+### `ExamplesSsaAnalyses.v` — EX-5a, ANA-3, ANA-5 to ANA-9, ANA-10a, ANA-10e
 
 - `label_encoding`, `sop_encoding`, `const_numeric`, `const_conc`, `liveness_at` — Definitions;
   EX-5a encodings, constant domain and executable liveness wrapper.
@@ -1045,7 +1073,7 @@ Contract: [Examples](examples.md).
   `ssa_callee_leaf_sound` — Theorems; ANA-8 call and summary claims.
 - `ssa_andersen_sound`, `ssa_steensgaard_sound`, `ssa_escape_sound` — Theorems; ANA-9 pointer
   and escape claims.
-- `ssa_immutable_sound` — Theorem; ANA-10 preservation of unwritten bytes.
+- `ssa_immutable_sound` — Theorem; ANA-10a preservation of unwritten bytes.
 - `factorial_ssa`, `z_value`, `p_value`, `loop_header_point` — Definitions; EX-5a factorial fixture.
 - `factorial_wf`, `factorial_z_live`, `factorial_z_dead`, `factorial_p_needed` — Examples; EX-5a
   computed typing, liveness and neededness checks.
@@ -1056,8 +1084,8 @@ Contract: [Examples](examples.md).
   fixture.
 - `scev_count_up_trip` — Example; ANA-7 computes and checks a trip count.
 - `chain_graph`, `chain_writes`, `chain_writes_clobber`, `chain_reads`, `chain_ssa` — Definitions;
-  ANA-10 MemorySSA fixtures.
-- `memoryssa_accepts`, `memoryssa_rejects` — Examples; ANA-10 checks a valid and invalid
+  ANA-10e MemorySSA fixtures.
+- `memoryssa_accepts`, `memoryssa_rejects` — Examples; ANA-10e checks a valid and invalid
   clobber walk.
 
 ## Views
@@ -2178,6 +2206,8 @@ Contract: [Examples](examples.md).
 
 - `region_table` — Definition; Computes a summary at every skeleton position.
 - `region_table_agrees` — Theorem; Each table entry agrees with the recursive region summary.
+- `census_atoms`, `occurrence_census` — static syntax traversal and encoded operand counts.
+- `occurrence_census_exact` — Theorem; lookup agrees with the flattened static occurrence count.
 
 ### `AnalysesValues.v` — ANA-3
 
@@ -2313,6 +2343,9 @@ Contract: [Examples](examples.md).
 
 ### `AnalysesEgraph.v` — ANA-6
 
+- `term_vars`, `legacy_subst`, `legacy_subst_bound` — finite replay substitution helpers.
+- `legacy_subst_present`, `legacy_subst_missing`, `legacy_subst_bound_spec` — helper laws.
+
 - `term` — Inductive; Variables and operator applications in e-graph terms.
 - `TVar` — Constructor; A variable in an e-graph term.
 - `TApp` — Constructor; An operator application in an e-graph term.
@@ -2336,7 +2369,7 @@ Contract: [Examples](examples.md).
 - `term_eqb` — Definition; Decidable equality test for terms.
 - `term_cost` — Definition; Sum of operator costs over a term.
 - `egraph` — Definition; Hash-consed nodes and union-find classes for equality saturation.
-- `saturate` — Definition; Runs untrusted equality saturation with bounded fuel.
+- `saturate` — Definition; Runs directly proved bounded Rewrite saturation.
 - `extract` — Definition; Extracts a candidate term from an e-graph.
 - `optimise` — Definition; Returns an extracted term only after explanation and cost checks.
 - `term_eqb_spec` — Theorem; Term equality succeeds exactly for equal terms.
@@ -2448,7 +2481,7 @@ Contract: [Examples](examples.md).
 - `callers_index_agrees` — Theorem; The caller index contains exactly the indexed call sites.
 - `arg_fact_sound` — Theorem; Joined argument facts cover actual arguments of calls.
 
-### `AnalysesPointsTo.v` — ANA-9
+### `AnalysesPointsToBase.v` — ANA-9a
 
 - `ptr_op` — Inductive; Pointer allocation, copy, load, store and escape operations.
 - `PAlloc` — Constructor; A pointer allocation operation.
@@ -2479,6 +2512,15 @@ Contract: [Examples](examples.md).
 - `heap_initial` — Field; Initial heap pointers satisfy the points-to premise.
 - `pts_origin` — Field; Every new pointer target has an allowed origin.
 - `heap_origin` — Field; Every new heap pointer target has an allowed origin.
+- `Build_ptr_view_laws` — Constructor; builds the pointer-view laws.
+- `andersen_sound`, `andersen_monotone`, `andersen_terminates` — Andersen specification laws.
+
+### `AnalysesPointsToDelta.v` — ANA-9a
+
+- `andersen_delta`, `andersen_delta_least`, `andersen_delta_sound` — direct delta producer and laws.
+
+### `AnalysesPointsTo.v` — ANA-9
+
 - `steens_result` — Record; Pointer classes and their associated pointee classes.
 - `SteensResult` — Constructor; Constructs the steens result record.
 - `classes` — Field; Union-find classes of pointer variables.
@@ -2495,15 +2537,12 @@ Contract: [Examples](examples.md).
 - `z_init` — Field; Initial existing blocks satisfy the zero-byte condition.
 - `z_fresh` — Field; Fresh allocations contain zero bytes.
 - `z_kept` — Field; Unwritten bytes preserve their prior zero value.
-- `andersen_sound` — Theorem; The points-to solution covers reachable pointer targets.
-- `andersen_monotone` — Theorem; The Andersen constraint system is monotone.
-- `andersen_terminates` — Theorem; Finite points-to universes provide termination evidence.
 - `steensgaard_sound` — Theorem; Unification classes cover reachable aliases.
 - `steensgaard_coarser` — Theorem; Steensgaard classes include least Andersen aliases.
 - `escaped_closed` — Theorem; The computed escaped-site set is closed under escape dependencies.
 - `zero_written_sound` — Theorem; Uncovered bytes of existing blocks remain zero.
 
-### `AnalysesMemory.v` — ANA-10
+### `AnalysesMemoryBase.v` — ANA-10a
 
 - `barrier_view` — Record; Validation and invalidation information for memory accesses.
 - `BarrierView` — Constructor; Constructs the barrier view record.
@@ -2537,28 +2576,40 @@ Contract: [Examples](examples.md).
 - `BytesView` — Constructor; Constructs the bytes view record.
 - `bgv` — Field; Graph view underlying byte-level memory analysis.
 - `writes_at` — Field; Footprints possibly written at a node.
-- `bsite` — Field; Allocation site of a live memory block.
+- `bsite` — Field; Historical allocation site retained after free.
 - `byte` — Field; Byte value at an allocation and offset.
 - `bytes_laws` — Record; Byte preservation and graph laws for memory steps.
 - `by_view` — Field; The byte graph view satisfies its laws.
 - `by_no_stays` — Field; The byte graph has no point-preserving steps.
 - `byte_frame` — Field; A changed byte is covered by the node's write footprints.
-- `mem_node` — Inductive; Memory definitions and live-on-entry nodes per function.
-- `MDef` — Constructor; A memory definition at a function and node.
-- `MLive` — Constructor; The live-on-entry memory node of a function.
-- `memory_ssa` — Record; Memory definitions selected for loads.
-- `MemorySSA` — Constructor; Constructs the memory ssa record.
-- `def_of_load` — Field; Memory definition selected for each load.
-- `build_memory_ssa` — Definition; Builds an untrusted MemorySSA candidate.
-- `no_clobber_check` — Definition; Checks that a MemorySSA path has no overlapping writes.
 - `footprints_disjoint` — Definition; Tests whether two footprint lists have disjoint bytes.
 - `invariant_load` — Definition; Tests loop-invariant address and non-overlapping loop writes.
 - `validated_sound` — Theorem; Validated access facts imply the stated accessibility property.
 - `dead_store_sound` — Theorem; Covered writes justify the dead-store agreement claim.
 - `footprints_disjoint_sound` — Theorem; The disjointness test implies disjoint covered bytes.
-- `no_clobber_unchanged` — Theorem; An accepted no-clobber walk preserves the selected bytes.
 - `immutable_sound` — Theorem; Bytes in a footprint without writes remain unchanged.
-- `invariant_load_sound` — Theorem; Repeated loads in one loop execution return the same value.
+- `invariant_load_sound` — Theorem; Covered bytes stay unchanged within the loop.
+
+- `byte_site_stable` — field; preserves a historical identity's site on each reachable step.
+- `epoch_view`, `EpochView`, `epoch_bytes`, `epoch_live` — record, constructor and fields; concrete
+  allocation identity and liveness view.
+- `epoch_laws`, `Build_epoch_laws`, `epoch_byte_laws`, `epoch_live_site`,
+  `epoch_allocate_fresh` — law record, constructor and fields; historical sites and fresh identity.
+- `epoch_no_resurrection` — Theorem; a dead identity with a historical site remains dead.
+
+
+### `AnalysesMemoryLegacy.v` — ANA-10e
+
+- `mem_node`, `MDef`, `MLive` — memory definition or live-on-entry node.
+- `memory_ssa`, `MemorySSA`, `def_of_load` — legacy load-to-definition candidate.
+- `no_clobber_check`, `no_clobber_unchanged` — validated candidate and byte-frame theorem.
+
+- `legacy_nodes`, `legacy_disjoint`, `legacy_disjoint_b`, `legacy_pair_clear` — all-walk legacy
+  specification and exact disjointness test.
+- `legacy_disjoint_b_correct`, `no_clobber_check_correct`, `project_memory_legacy_correct` —
+  Theorems; disjointness reflection, checker reflection and safe projection.
+- `project_memory_legacy` — Definition; conditional projection from the version walker.
+
 
 ### `AnalysesRules.v` — ANA-11
 
@@ -2595,3 +2646,904 @@ Contract: [Examples](examples.md).
 - `rules_liveness_model` — Theorem; The rules database represents the least liveness model.
 - `rules_neededness_model` — Theorem; The rules database represents the least neededness model.
 - `rules_reaching_model` — Theorem; The database represents the least reaching-definitions model.
+
+
+## C19 additions
+
+The owning API documents fix signatures and theorem statements. These entries are contracts,
+not evidence of completed implementations. ANA-6 owns its direct Rewrite facade and legacy replay;
+REW-7 owns the independent Order, SSA and word clients.
+
+### `RewriteSyntax.v` — REW-1
+
+- `rw_term` — public declaration; see the owning API contract.
+- `RWVar` — public declaration; see the owning API contract.
+- `RWApp` — public declaration; see the owning API contract.
+- `rw_pattern` — public declaration; see the owning API contract.
+- `RWHole` — public declaration; see the owning API contract.
+- `RWPVar` — public declaration; see the owning API contract.
+- `RWPApp` — public declaration; see the owning API contract.
+- `rw_sort` — public declaration; see the owning API contract.
+- `rwp_sort` — public declaration; see the owning API contract.
+- `rw_signature` — public declaration; see the owning API contract.
+- `RwSignature` — public declaration; see the owning API contract.
+- `rw_var_sort` — public declaration; see the owning API contract.
+- `rw_operator_shape` — public declaration; see the owning API contract.
+- `rw_typed` — public declaration; see the owning API contract.
+- `rw_typed_var` — public declaration; see the owning API contract.
+- `rw_typed_app` — public declaration; see the owning API contract.
+- `rwp_typed` — public declaration; see the owning API contract.
+- `rwp_typed_hole` — public declaration; see the owning API contract.
+- `rwp_typed_var` — public declaration; see the owning API contract.
+- `rwp_typed_app` — public declaration; see the owning API contract.
+- `rw_substitution` — public declaration; see the owning API contract.
+- `rw_sub_typed` — public declaration; see the owning API contract.
+- `rw_instantiate` — public declaration; see the owning API contract.
+- `rw_instantiate_typed` — public declaration; see the owning API contract.
+
+### `RewriteRules.v` — REW-1
+
+- `rw_semantics` — public declaration; see the owning API contract.
+- `RwSemantics` — public declaration; see the owning API contract.
+- `rw_var_value` — public declaration; see the owning API contract.
+- `rw_eval_op` — public declaration; see the owning API contract.
+- `rw_denote` — public declaration; see the owning API contract.
+- `rw_equiv` — public declaration; see the owning API contract.
+- `rw_rule` — public declaration; see the owning API contract.
+- `RwRule` — public declaration; see the owning API contract.
+- `rw_holes` — public declaration; see the owning API contract.
+- `rw_hole_sort` — public declaration; see the owning API contract.
+- `rw_lhs` — public declaration; see the owning API contract.
+- `rw_rhs` — public declaration; see the owning API contract.
+- `rw_condition` — public declaration; see the owning API contract.
+- `rw_rule_wf` — public declaration; see the owning API contract.
+- `rw_rule_sound` — public declaration; see the owning API contract.
+
+### `RewriteEquality.v` — REW-1
+
+- `rw_equal` — public declaration; see the owning API contract.
+- `rw_eq_refl` — public declaration; see the owning API contract.
+- `rw_eq_sym` — public declaration; see the owning API contract.
+- `rw_eq_trans` — public declaration; see the owning API contract.
+- `rw_eq_app` — public declaration; see the owning API contract.
+- `rw_eq_rule` — public declaration; see the owning API contract.
+- `rw_equal_sound` — public declaration; see the owning API contract.
+- `rw_equal_typed` — public declaration; see the owning API contract.
+
+### `RewriteEgraph.v` — REW-2
+
+- `rw_union_structure` — structural relationship of a successful union.
+
+- `rw_id` — public declaration; see the owning API contract.
+- `rw_node` — public declaration; see the owning API contract.
+- `RWNVar` — public declaration; see the owning API contract.
+- `RWNApp` — public declaration; see the owning API contract.
+- `rw_node_sort` — public declaration; see the owning API contract.
+- `rw_graph` — public declaration; see the owning API contract.
+- `RwGraph` — public declaration; see the owning API contract.
+- `rw_roots` — public declaration; see the owning API contract.
+- `rw_nodes_in` — public declaration; see the owning API contract.
+- `rw_class_roots` — public declaration; see the owning API contract.
+- `rw_sorts` — public declaration; see the owning API contract.
+- `rw_nodes` — public declaration; see the owning API contract.
+- `rw_find` — public declaration; see the owning API contract.
+- `rw_class_sort` — public declaration; see the owning API contract.
+- `rw_node_at` — public declaration; see the owning API contract.
+- `rw_represents` — public declaration; see the owning API contract.
+- `rw_repr_var` — public declaration; see the owning API contract.
+- `rw_repr_app` — public declaration; see the owning API contract.
+- `rw_graph_wf` — public declaration; see the owning API contract.
+- `rw_graph_sound` — public declaration; see the owning API contract.
+- `rw_extends` — public declaration; see the owning API contract.
+- `rw_clean` — public declaration; see the owning API contract.
+- `rw_productive` — public declaration; see the owning API contract.
+- `rw_joinable` — public declaration; see the owning API contract.
+- `rw_empty` — public declaration; see the owning API contract.
+- `rw_add` — public declaration; see the owning API contract.
+- `rw_union` — public declaration; see the owning API contract.
+- `rw_empty_wf` — public declaration; see the owning API contract.
+- `rw_empty_sound` — public declaration; see the owning API contract.
+- `rw_empty_productive` — public declaration; see the owning API contract.
+- `rw_add_correct` — public declaration; see the owning API contract.
+- `rw_union_correct` — public declaration; see the owning API contract.
+
+### `RewriteIndex.v` — REW-2
+
+- `rw_index_root_parents`, `rw_parent_nodes`, `rw_parent_nodes_agree` — canonical parent index.
+- `rw_index_after_union`, `rw_index_after_union_agrees` — union index update and agreement.
+- `rw_index_after_node_change`, `rw_index_after_node_change_agrees` — node updates and agreement.
+
+- `rw_index` — public declaration; see the owning API contract.
+- `RwIndex` — public declaration; see the owning API contract.
+- `rw_index_ops` — public declaration; see the owning API contract.
+- `rw_index_parents` — public declaration; see the owning API contract.
+- `rw_lookup_list` — public declaration; see the owning API contract.
+- `rw_index_agrees` — public declaration; see the owning API contract.
+- `rw_build_index` — public declaration; see the owning API contract.
+- `rw_build_index_agrees` — public declaration; see the owning API contract.
+
+### `RewriteRebuild.v` — REW-2
+
+- `rw_rebuild` — public declaration; see the owning API contract.
+- `rw_rebuild_correct` — public declaration; see the owning API contract.
+
+### `RewriteMatch.v` — REW-3
+
+- `rwp_holes` — public declaration; see the owning API contract.
+- `rw_assignment` — public declaration; see the owning API contract.
+- `rw_covers` — public declaration; see the owning API contract.
+- `rw_match` — public declaration; see the owning API contract.
+- `rw_match_sound` — public declaration; see the owning API contract.
+- `rw_match_complete` — public declaration; see the owning API contract.
+
+### `RewriteAnalysis.v` — REW-4
+
+- `rw_analysis` — public declaration; see the owning API contract.
+- `RwAnalysis` — public declaration; see the owning API contract.
+- `rw_fact_holds` — public declaration; see the owning API contract.
+- `rw_fact_unknown` — public declaration; see the owning API contract.
+- `rw_fact_combine` — public declaration; see the owning API contract.
+- `rw_fact_transfer` — public declaration; see the owning API contract.
+- `rw_fact_valid` — public declaration; see the owning API contract.
+- `rw_facts_valid` — public declaration; see the owning API contract.
+- `rw_analysis_laws` — public declaration; see the owning API contract.
+- `rw_unknown_valid` — public declaration; see the owning API contract.
+- `rw_combine_valid` — public declaration; see the owning API contract.
+- `rw_transfer_valid` — public declaration; see the owning API contract.
+- `rw_analyse_step` — public declaration; see the owning API contract.
+- `rw_analyse_step_valid` — public declaration; see the owning API contract.
+
+### `RewriteRun.v` — REW-5
+
+- `rw_attempt` — public declaration; see the owning API contract.
+- `RwAttempt` — public declaration; see the owning API contract.
+- `rw_attempt_rule` — public declaration; see the owning API contract.
+- `rw_attempt_root` — public declaration; see the owning API contract.
+- `rw_attempt_sub` — public declaration; see the owning API contract.
+- `rw_attempt_substitution` — public declaration; see the owning API contract.
+- `rw_check_sub` — public declaration; see the owning API contract.
+- `rw_check_sub_sound` — public declaration; see the owning API contract.
+- `rw_check_sub_complete` — public declaration; see the owning API contract.
+- `rw_rep_test` — public declaration; see the owning API contract.
+- `rw_rep_test_spec` — public declaration; see the owning API contract.
+- `rw_apply` — public declaration; see the owning API contract.
+- `rw_apply_correct` — public declaration; see the owning API contract.
+- `rw_stop` — public declaration; see the owning API contract.
+- `RWStopped` — public declaration; see the owning API contract.
+- `RWFuelExhausted` — public declaration; see the owning API contract.
+- `rw_run_result` — public declaration; see the owning API contract.
+- `RwRunResult` — public declaration; see the owning API contract.
+- `rw_run_graph` — public declaration; see the owning API contract.
+- `rw_run_stop` — public declaration; see the owning API contract.
+- `rw_strategy` — public declaration; see the owning API contract.
+- `rw_run` — public declaration; see the owning API contract.
+- `rw_run_correct` — public declaration; see the owning API contract.
+
+### `RewriteExtract.v` — REW-6
+
+- `rw_tree_cost` — public declaration; see the owning API contract.
+- `rw_extract_tree` — public declaration; see the owning API contract.
+- `rw_extract_tree_some` — public declaration; see the owning API contract.
+- `rw_extract_tree_none` — public declaration; see the owning API contract.
+- `rw_extract_tree_equiv` — public declaration; see the owning API contract.
+
+### `AnalysesEgraph.v` — ANA-6 (direct facade)
+
+- `legacy_graph`, `legacy_root`, `legacy_saturate_direct` — direct facade and preservation.
+
+- `legacy_signature` — public declaration; see the owning API contract.
+- `legacy_embed` — public declaration; see the owning API contract.
+- `legacy_project` — public declaration; see the owning API contract.
+- `legacy_pattern` — public declaration; see the owning API contract.
+- `legacy_substitution` — public declaration; see the owning API contract.
+- `legacy_semantics` — public declaration; see the owning API contract.
+- `legacy_admissible` — public declaration; see the owning API contract.
+- `legacy_variables` — public declaration; see the owning API contract.
+- `legacy_rule_holes` — public declaration; see the owning API contract.
+- `legacy_total_sub` — public declaration; see the owning API contract.
+- `legacy_rule` — public declaration; see the owning API contract.
+- `legacy_at` — public declaration; see the owning API contract.
+- `legacy_replace_at` — public declaration; see the owning API contract.
+- `rw_at` — public declaration; see the owning API contract.
+- `rw_replace_at` — public declaration; see the owning API contract.
+- `legacy_project_embed` — public declaration; see the owning API contract.
+- `legacy_embed_typed` — public declaration; see the owning API contract.
+- `legacy_denote_agrees` — public declaration; see the owning API contract.
+- `legacy_substitute_agrees` — public declaration; see the owning API contract.
+- `legacy_at_agrees` — public declaration; see the owning API contract.
+- `legacy_replace_agrees` — public declaration; see the owning API contract.
+- `legacy_equiv_agrees` — public declaration; see the owning API contract.
+- `legacy_cost_agrees` — public declaration; see the owning API contract.
+- `legacy_rule_wf` — public declaration; see the owning API contract.
+- `legacy_rule_sound` — public declaration; see the owning API contract.
+- `legacy_guard_uses_witness` — public declaration; see the owning API contract.
+
+### `AnalysesRewriteDomains.v` — REW-7
+
+- `rw_order_holds` — public declaration; see the owning API contract.
+- `rw_order_analysis` — public declaration; see the owning API contract.
+- `rw_order_transfer_sound` — public declaration; see the owning API contract.
+- `rw_order_analysis_laws` — public declaration; see the owning API contract.
+
+### `AnalysesSsaRewrite.v` — REW-7
+
+- `ssa_rw_semantics` — public declaration; see the owning API contract.
+- `ssa_rewrite_value` — public declaration; see the owning API contract.
+- `ssa_region_state` — public declaration; see the owning API contract.
+- `ssa_region_semantics` — public declaration; see the owning API contract.
+- `ssa_region_endings` — public declaration; see the owning API contract.
+- `ssa_region_relation` — public declaration; see the owning API contract.
+- `ssa_region_bisimulation` — public declaration; see the owning API contract.
+- `ssa_region_rewrite_behaviour` — public declaration; see the owning API contract.
+- `rw_replacement_laws` — public declaration; see the owning API contract.
+- `rw_replacement_bisim` — public declaration; see the owning API contract.
+- `rw_replacement_behaviour` — public declaration; see the owning API contract.
+
+### `AnalysesRewriteWord.v` — REW-7
+
+- `rw_word_op` — public declaration; see the owning API contract.
+- `WordLit` — public declaration; see the owning API contract.
+- `WordAdd` — public declaration; see the owning API contract.
+- `WordMul` — public declaration; see the owning API contract.
+- `WordDiv` — public declaration; see the owning API contract.
+- `WordRotl` — public declaration; see the owning API contract.
+- `rw_word_encoding` — public declaration; see the owning API contract.
+- `rw_word_sig` — public declaration; see the owning API contract.
+- `rw_word_eval` — public declaration; see the owning API contract.
+- `rw_word_admissible` — public declaration; see the owning API contract.
+- `rw_ground_pattern` — public declaration; see the owning API contract.
+- `rw_word_add_zero` — public declaration; see the owning API contract.
+- `rw_word_mul_one` — public declaration; see the owning API contract.
+- `rw_word_rotate_zero` — public declaration; see the owning API contract.
+- `rw_word_div_self` — public declaration; see the owning API contract.
+- `rw_word_nonzero` — public declaration; see the owning API contract.
+- `rw_word_analysis` — public declaration; see the owning API contract.
+- `rw_word_nonzero_check` — public declaration; see the owning API contract.
+- `rw_word_analysis_laws` — public declaration; see the owning API contract.
+- `rw_word_singleton_nonzero` — public declaration; see the owning API contract.
+- `rw_word_literal_fact` — public declaration; see the owning API contract.
+- `rw_word_add_zero_sound` — public declaration; see the owning API contract.
+- `rw_word_mul_one_sound` — public declaration; see the owning API contract.
+- `rw_word_rotate_zero_sound` — public declaration; see the owning API contract.
+- `rw_word_add_zero_wf` — public declaration; see the owning API contract.
+- `rw_word_mul_one_wf` — public declaration; see the owning API contract.
+- `rw_word_rotate_zero_wf` — public declaration; see the owning API contract.
+- `rw_word_div_self_wf` — public declaration; see the owning API contract.
+- `rw_word_div_self_sound` — public declaration; see the owning API contract.
+- `rw_word_demo_add` — public declaration; see the owning API contract.
+- `rw_word_demo_mul` — public declaration; see the owning API contract.
+- `rw_word_demo_rotate` — public declaration; see the owning API contract.
+- `rw_word_demo_div` — public declaration; see the owning API contract.
+- `rw_word_demo_zero` — public declaration; see the owning API contract.
+
+### `RulesJoin.v` — RUL-2a
+
+- `join_strategy` — public declaration; see the owning API contract.
+- `IndexedNested` — public declaration; see the owning API contract.
+- `IndexedMultiway` — public declaration; see the owning API contract.
+- `fire_rule_join` — public declaration; see the owning API contract.
+- `fire_rule_join_exact` — public declaration; see the owning API contract.
+- `fire_rule_join_wf` — public declaration; see the owning API contract.
+
+### `RulesDelta.v` — RUL-2b
+
+- `solve_program_delta` — public declaration; see the owning API contract.
+- `solve_program_delta_exact` — public declaration; see the owning API contract.
+- `solve_program_delta_none` — public declaration; see the owning API contract.
+- `solve_program_delta_agrees` — public declaration; see the owning API contract.
+
+### `CollectionsDenseSet.v` — COL-3
+
+- `dense_universe` — public declaration; see the owning API contract.
+- `DenseUniverse` — public declaration; see the owning API contract.
+- `dense_keys` — public declaration; see the owning API contract.
+- `dense_index` — public declaration; see the owning API contract.
+- `dense_universe_wf` — public declaration; see the owning API contract.
+- `dense_prepare` — public declaration; see the owning API contract.
+- `dense_set` — public declaration; see the owning API contract.
+- `dense_empty` — public declaration; see the owning API contract.
+- `dense_mem` — public declaration; see the owning API contract.
+- `dense_add` — public declaration; see the owning API contract.
+- `dense_remove` — public declaration; see the owning API contract.
+- `dense_union` — public declaration; see the owning API contract.
+- `dense_inter` — public declaration; see the owning API contract.
+- `dense_diff` — public declaration; see the owning API contract.
+- `dense_subset` — public declaration; see the owning API contract.
+- `dense_to_finset` — public declaration; see the owning API contract.
+- `dense_of_finset` — public declaration; see the owning API contract.
+- `dense_prepare_wf` — public declaration; see the owning API contract.
+- `dense_mem_refines` — public declaration; see the owning API contract.
+- `dense_roundtrip` — public declaration; see the owning API contract.
+- `dense_union_mem` — public declaration; see the owning API contract.
+- `dense_inter_mem` — public declaration; see the owning API contract.
+- `dense_diff_mem` — public declaration; see the owning API contract.
+- `dense_subset_spec` — public declaration; see the owning API contract.
+- `dense_add_mem` — public declaration; see the owning API contract.
+- `dense_remove_mem` — public declaration; see the owning API contract.
+
+### `FixpointNested.v` — FIX-5
+
+- `nested_run` — public declaration; see the owning API contract.
+- `nested_solve_fuel` — public declaration; see the owning API contract.
+- `nested_run_sound` — public declaration; see the owning API contract.
+- `nested_run_eventually` — public declaration; see the owning API contract.
+
+### `FixpointObserve.v` — FIX-6
+
+- `observation_plan` — public declaration; see the owning API contract.
+- `ObservationPlan` — public declaration; see the owning API contract.
+- `observation_components` — public declaration; see the owning API contract.
+- `observation_expire` — public declaration; see the owning API contract.
+- `observation_prepare` — public declaration; see the owning API contract.
+- `observation_plan_check` — public declaration; see the owning API contract.
+- `observation_reference` — public declaration; see the owning API contract.
+- `observation_project` — public declaration; see the owning API contract.
+- `observation_full_reference` — public declaration; see the owning API contract.
+- `observation_run` — public declaration; see the owning API contract.
+- `observation_prepare_checked` — public declaration; see the owning API contract.
+- `observation_run_refines` — public declaration; see the owning API contract.
+- `observation_reference_projection` — public declaration; see the owning API contract.
+- `observation_full_reference_sound` — public declaration; see the owning API contract.
+- `observation_plan_complete` — public declaration; see the owning API contract.
+- `observation_run_eventually` — public declaration; see the owning API contract.
+
+### `FixpointLocalDirect.v` — FIX-7
+
+- `local_direct_closure`, `local_direct_system`, `local_direct_static`, `local_direct` — static
+  closure, restricted system and direct local producer.
+- `local_direct_closure_wf`, `local_direct_closure_roots`, `local_direct_closure_complete` —
+  closure properties.
+- `local_direct_closure_least`, `local_direct_system_constraints` — least closure and exact
+  restricted-constraint membership.
+- `local_direct_roots`, `local_direct_closed` — root coverage and closed partial solution.
+
+### `DomainsKnownBitsFast.v` — DOM-8
+
+- `tnum_mul_precise` — public declaration; see the owning API contract.
+- `known_bits_precise_domain` — public declaration; see the owning API contract.
+- `tnum_mul_precise_sound` — public declaration; see the owning API contract.
+- `known_bits_precise_word_laws` — public declaration; see the owning API contract.
+- `tnum_mul_precise_constants` — public declaration; see the owning API contract.
+
+### `ViewsSsaPoints.v` — VIEW-8
+
+- `point_uses` — public declaration; see the owning API contract.
+- `PointUses` — public declaration; see the owning API contract.
+- `live_graph` — public declaration; see the owning API contract.
+- `edge_use` — public declaration; see the owning API contract.
+- `edge_def` — public declaration; see the owning API contract.
+- `exit_use` — public declaration; see the owning API contract.
+- `syntactic_live` — public declaration; see the owning API contract.
+- `live_exit` — public declaration; see the owning API contract.
+- `live_edge_use` — public declaration; see the owning API contract.
+- `live_edge_next` — public declaration; see the owning API contract.
+- `ssa_points` — public declaration; see the owning API contract.
+- `SsaPoints` — public declaration; see the owning API contract.
+- `point_chain` — public declaration; see the owning API contract.
+- `point_chain_one` — public declaration; see the owning API contract.
+- `point_chain_step` — public declaration; see the owning API contract.
+- `point_model` — public declaration; see the owning API contract.
+- `block_graph` — public declaration; see the owning API contract.
+- `points_in_block` — public declaration; see the owning API contract.
+- `instruction_edges` — public declaration; see the owning API contract.
+- `parameter_edge` — public declaration; see the owning API contract.
+- `block_of_point` — public declaration; see the owning API contract.
+- `block_edge_of` — public declaration; see the owning API contract.
+- `block_params` — public declaration; see the owning API contract.
+- `block_edge_args` — public declaration; see the owning API contract.
+- `point_definition` — public declaration; see the owning API contract.
+- `point_use_at` — public declaration; see the owning API contract.
+- `ssa_point_laws` — public declaration; see the owning API contract.
+- `points_graph_wf` — public declaration; see the owning API contract.
+- `points_out_nodup` — public declaration; see the owning API contract.
+- `blocks_graph_wf` — public declaration; see the owning API contract.
+- `blocks_out_nodup` — public declaration; see the owning API contract.
+- `points_covered` — public declaration; see the owning API contract.
+- `points_unique` — public declaration; see the owning API contract.
+- `points_owner` — public declaration; see the owning API contract.
+- `blocks_nonempty` — public declaration; see the owning API contract.
+- `points_ordered` — public declaration; see the owning API contract.
+- `instruction_edges_internal` — public declaration; see the owning API contract.
+- `instruction_edges_complete` — public declaration; see the owning API contract.
+- `parameter_edge_first` — public declaration; see the owning API contract.
+- `parameter_edge_defs` — public declaration; see the owning API contract.
+- `point_edge_projection` — public declaration; see the owning API contract.
+- `phi_args_length` — public declaration; see the owning API contract.
+- `phi_edge_use` — public declaration; see the owning API contract.
+- `block_edge_covered` — public declaration; see the owning API contract.
+- `block_edge_unique` — public declaration; see the owning API contract.
+- `reachable_point_ssa` — public declaration; see the owning API contract.
+- `point_ssa_single_entry` — public declaration; see the owning API contract.
+- `point_ssa_uses_defined` — public declaration; see the owning API contract.
+- `point_ssa_defs_at_home` — public declaration; see the owning API contract.
+- `point_ssa_home_kills` — public declaration; see the owning API contract.
+
+### `AnalysesSsaLiveQuery.v` — ANA-12
+
+- `reduced_path` — public declaration; see the owning API contract.
+- `rt_step` — public declaration; see the owning API contract.
+- `rt_reaches` — public declaration; see the owning API contract.
+- `ssa_query_graph` — public declaration; see the owning API contract.
+- `SsaQueryGraph` — public declaration; see the owning API contract.
+- `query_cfg` — public declaration; see the owning API contract.
+- `query_dfs` — public declaration; see the owning API contract.
+- `query_dom` — public declaration; see the owning API contract.
+- `query_reduced` — public declaration; see the owning API contract.
+- `query_back_closure` — public declaration; see the owning API contract.
+- `ssa_query_values` — public declaration; see the owning API contract.
+- `SsaQueryValues` — public declaration; see the owning API contract.
+- `query_def` — public declaration; see the owning API contract.
+- `query_uses` — public declaration; see the owning API contract.
+- `live_index_get` — public declaration; see the owning API contract.
+- `prepare_ssa_query_graph` — public declaration; see the owning API contract.
+- `prepare_ssa_query_values` — public declaration; see the owning API contract.
+- `ssa_live_query` — public declaration; see the owning API contract.
+- `ssa_query_graph_structure` — public declaration; see the owning API contract.
+- `ssa_query_graph_agrees` — public declaration; see the owning API contract.
+- `ssa_query_values_agree` — public declaration; see the owning API contract.
+- `ssa_live_query_exact` — public declaration; see the owning API contract.
+- `ssa_live_query_dense` — public declaration; see the owning API contract.
+- `ssa_live_query_rules` — public declaration; see the owning API contract.
+
+### `AnalysesSsaLiveSets.v` — ANA-13
+
+- `sparse_live_materialize` — public declaration; see the owning API contract.
+- `sparse_live_at` — public declaration; see the owning API contract.
+- `sparse_live_materialize_exact` — public declaration; see the owning API contract.
+- `sparse_live_materialize_dense` — public declaration; see the owning API contract.
+- `sparse_live_materialize_rules` — public declaration; see the owning API contract.
+- `sparse_live_query_agrees` — public declaration; see the owning API contract.
+
+### `AnalysesLiveness.v` — ANA-1
+
+- `var_point_uses` — public declaration; see the owning API contract.
+- `syntactic_live_least` — public declaration; see the owning API contract.
+
+### `AnalysesRules.v` — ANA-11
+
+- `syntactic_live_rules` — public declaration; see the owning API contract.
+
+
+<!-- C19 memory names -->
+
+
+### `ViewsMemoryEffects.v` — ANA-10b
+
+- `memory_scope`, `MemoryRegions`, `MemoryAll`, `memory_scope_covers` — scope type, constructors
+  and coverage predicate.
+- `memory_effect`, `MemoryRead`, `MemoryWrite`, `MemoryReadWrite`, `MemoryCall`, `MemoryBarrier`,
+  `effect_reads`, `effect_writes`, `effect_is_def` — ordered effects and their projections.
+- `memory_effect_view`, `MemoryEffectView`, `effect_graph`, `edge_effects`, `effect_snapshot`,
+  `effect_site`, `effect_byte`, `effect_step`, `effect_read`, `transition_read` — client view.
+- `effect_trace`, `effect_trace_nil`, `effect_trace_cons`, `effect_trace_states`,
+  `effect_states_nil`, `effect_states_cons` — ordered snapshot trace relations and constructors.
+- `memory_effect_laws`, `Build_memory_effect_laws`, `effect_view_laws`, `effect_no_stays`,
+  `effect_step_trace`, `effect_read_covered`, `effect_site_stable`, `effect_byte_frame` — laws.
+- `effect_transition_byte_covered` — Theorem; a changed byte is covered by a listed effect.
+
+### `AnalysesMemoryGraph.v` — ANA-10b
+
+- `memory_version`, `MemoryLive`, `MemoryPhi`, `MemoryDef` — structural version identifiers.
+- `memory_graph`, `MemoryGraph`, `memory_phis`, `memory_versions`, `memory_in`, `memory_before`,
+  `memory_out`, `memory_operand` — graph representation and projections.
+- `memory_occurrence`, `memory_phi_at`, `memory_valid_version`, `memory_after` — model predicates
+  and effect transfer.
+- `memory_edge_flow`, `memory_edge_nil`, `memory_edge_cons`, `memory_arrival` — local edge flow
+  and incoming-edge phi selection.
+- `memory_graph_wf`, `Build_memory_graph_wf`, `memory_cfg_wf`, `memory_phis_nodup`,
+  `memory_phi_reachable`, `memory_versions_nodup`, `memory_versions_exact`,
+  `memory_entries_arrive`, `memory_edges_flow`, `memory_edges_arrive`, `memory_in_valid`,
+  `memory_out_valid`, `memory_before_domain`, `memory_operand_domain` — graph law record and fields.
+- `memory_path_flow`, `memory_path_nil`, `memory_path_cons`, `memory_last_defs`,
+  `memory_last_path` — path flow and last dynamic definition.
+- `memory_edge_provenance`, `memory_edge_provenance_nil`, `memory_edge_provenance_cons`,
+  `memory_provenance`, `memory_provenance_entry`, `memory_provenance_edge`,
+  `memory_occurrence_history` — coupled static version and dynamic origin relations.
+- `memory_path_correspondence`, `memory_occurrence_input_valid`,
+  `memory_definition_before_occurrence`, `memory_execution_correspondence` — Theorems; graph,
+  occurrence, provenance and concrete execution correspondence.
+
+### `AnalysesMemoryFrontier.v` — ANA-10c
+
+- `memory_dom_node`, `MemoryRoot`, `MemoryBlock`, `MemoryEdge`, `memory_dom_edge`, `MemoryStart`,
+  `MemoryBegin`, `MemoryEnd` — split-edge graph identifiers.
+- `memory_dom_node_encoding`, `memory_dom_edge_encoding`, `memory_dom_graph`, `memory_dom_defs`,
+  `memory_frontier_build` — encodings, expanded graph, defining nodes and proved builder.
+- `memory_dom_graph_wf`, `memory_dom_reachable`, `memory_frontier_phi_exact`,
+  `memory_frontier_path` — Theorems; expansion, exact phi placement and path preservation.
+
+### `AnalysesMemorySealed.v` — ANA-10d
+
+- `memory_sealed_build` — Definition; directly proved sealed-block graph producer.
+- `memory_sealed_path`, `memory_sealed_definition_before_occurrence` — Theorems; path and
+  path-specific definition correspondence.
+
+### `AnalysesMemoryWalk.v` — ANA-10e
+
+- `memory_scopes_disjoint`, `memory_effect_has_read` — executable scope and read tests.
+- `memory_scopes_disjoint_sound` — Theorem; a positive test excludes a common byte.
+- `memory_walk_next`, `memory_walk_skip_def`, `memory_walk_phi`, `memory_walk_trace`,
+  `memory_walk_single`, `memory_walk_cons`, `memory_trace_last`, `memory_walk_terminal` —
+  declarative backward walk.
+- `memory_clobber_result`, `MemoryClobberResult`, `clobber_roots`, `clobber_complete`,
+  `memory_clobbers` — conservative finite query result and producer.
+- `memory_clobbers_cover`, `memory_clobbers_complete`, `memory_clobbers_follow_execution` —
+  Theorems; cut coverage, completed-walk exactness and dynamic provenance coverage.
+- `memory_last_clobbers`, `memory_path_last_clobber` — path-specific last may-clobber.
+
+
+### `AnalysesMemoryFlow.v` — ANA-10f
+
+- `memory_version_encoding`, `memory_flow_facts`, `memory_flow_lattice`, `memory_flow_system`,
+  `memory_flow_static`, `memory_flow_solve` — finite source system and total function result.
+- `memory_flow_reaches`, `memory_flow_terminal`, `memory_flow_step` — finite source reachability.
+- `memory_flow_least`, `memory_flow_exact`, `memory_flow_execution`,
+  `memory_builders_flow_agree` — Theorems; leastness, reachability exactness and actual path
+  source inclusion and agreement across builders.
+
+### `AnalysesMemoryForward.v` — ANA-10f
+
+- `memory_read_bytes` — Definition; increasing-address optional byte sequence.
+- `memory_value_view`, `MemoryValueView`, `store_location`, `load_location`, `stored_value`,
+  `loaded_value`, `decode_memory_value` — client value observation and decoding view.
+- `memory_value_laws`, `Build_memory_value_laws`, `memory_value_byte_range`,
+  `memory_store_encoding`, `memory_load_decoding` — concrete byte/value client laws.
+- `memory_forward_value`, `memory_forward_projected` — Theorems; value equality for successful
+  same-object, same-range accesses under the stated checked or directly projected condition.
+
+
+
+<!-- C19 call names -->
+
+### `AnalysesCallScc.v` — ANA-8a
+
+- `call_index` — public declaration; see the call analysis contract.
+- `CallIndex` — public declaration; see the call analysis contract.
+- `indexed_targets` — public declaration; see the call analysis contract.
+- `indexed_callers` — public declaration; see the call analysis contract.
+- `prepare_calls` — public declaration; see the call analysis contract.
+- `prepare_calls_targets` — public declaration; see the call analysis contract.
+- `prepare_calls_callers` — public declaration; see the call analysis contract.
+- `solve_scc_summaries` — public declaration; see the call analysis contract.
+- `solve_scc_summaries_post` — public declaration; see the call analysis contract.
+- `solve_scc_summaries_least` — public declaration; see the call analysis contract.
+- `solve_scc_summaries_sound` — public declaration; see the call analysis contract.
+- `reachable_context` — public declaration; see the call analysis contract.
+- `context_root` — public declaration; see the call analysis contract.
+- `context_call` — public declaration; see the call analysis contract.
+- `solve_reachable_callstrings` — public declaration; see the call analysis contract.
+- `reachable_callstrings_least` — public declaration; see the call analysis contract.
+- `arg_facts_indexed` — public declaration; see the call analysis contract.
+- `callers_index_wf` — public declaration; see the call analysis contract.
+- `arg_facts_indexed_agrees` — public declaration; see the call analysis contract.
+
+### `AnalysesInterprocedural.v` — ANA-8b
+
+- `ip_kind` — public declaration; see the call analysis contract.
+- `IpInternal` — public declaration; see the call analysis contract.
+- `IpCall` — public declaration; see the call analysis contract.
+- `IpReturn` — public declaration; see the call analysis contract.
+- `ip_edge` — public declaration; see the call analysis contract.
+- `IpEdge` — public declaration; see the call analysis contract.
+- `ip_source` — public declaration; see the call analysis contract.
+- `ip_target` — public declaration; see the call analysis contract.
+- `ip_action` — public declaration; see the call analysis contract.
+- `ip_pairs` — public declaration; see the call analysis contract.
+- `ip_problem` — public declaration; see the call analysis contract.
+- `IpProblem` — public declaration; see the call analysis contract.
+- `ip_nodes` — public declaration; see the call analysis contract.
+- `ip_sites` — public declaration; see the call analysis contract.
+- `ip_facts` — public declaration; see the call analysis contract.
+- `ip_edges` — public declaration; see the call analysis contract.
+- `ip_problem_wf` — public declaration; see the call analysis contract.
+- `ip_step` — public declaration; see the call analysis contract.
+- `ip_step_internal` — public declaration; see the call analysis contract.
+- `ip_step_call` — public declaration; see the call analysis contract.
+- `ip_step_return` — public declaration; see the call analysis contract.
+- `ip_path` — public declaration; see the call analysis contract.
+- `ip_path_refl` — public declaration; see the call analysis contract.
+- `ip_path_step` — public declaration; see the call analysis contract.
+- `ifds_solve` — public declaration; see the call analysis contract.
+- `ifds_solve_exact` — public declaration; see the call analysis contract.
+- `ide_problem` — public declaration; see the call analysis contract.
+- `IdeProblem` — public declaration; see the call analysis contract.
+- `ide_graph` — public declaration; see the call analysis contract.
+- `ide_lattice` — public declaration; see the call analysis contract.
+- `ide_values` — public declaration; see the call analysis contract.
+- `ide_weight` — public declaration; see the call analysis contract.
+- `ide_laws` — public declaration; see the call analysis contract.
+- `Build_ide_laws` — public declaration; see the call analysis contract.
+- `ide_graph_wf` — public declaration; see the call analysis contract.
+- `ide_value_finite` — public declaration; see the call analysis contract.
+- `ide_lat_laws` — public declaration; see the call analysis contract.
+- `ide_lub_laws` — public declaration; see the call analysis contract.
+- `ide_distributive` — public declaration; see the call analysis contract.
+- `ide_path` — public declaration; see the call analysis contract.
+- `ide_path_refl` — public declaration; see the call analysis contract.
+- `ide_path_step` — public declaration; see the call analysis contract.
+- `ide_solve` — public declaration; see the call analysis contract.
+- `ide_solve_exact` — public declaration; see the call analysis contract.
+
+### `AnalysesCallEffects.v` — ANA-8c
+
+- `return_projection` — public declaration; see the call analysis contract.
+- `ReturnProjection` — public declaration; see the call analysis contract.
+- `return_config` — public declaration; see the call analysis contract.
+- `normal_return` — public declaration; see the call analysis contract.
+- `return_projection_laws` — public declaration; see the call analysis contract.
+- `Build_return_projection_laws` — public declaration; see the call analysis contract.
+- `return_local_step` — public declaration; see the call analysis contract.
+- `return_exit` — public declaration; see the call analysis contract.
+- `may_return` — public declaration; see the call analysis contract.
+- `may_return_sound` — public declaration; see the call analysis contract.
+- `modref` — public declaration; see the call analysis contract.
+- `ModRef` — public declaration; see the call analysis contract.
+- `mr_reads` — public declaration; see the call analysis contract.
+- `mr_writes` — public declaration; see the call analysis contract.
+- `mr_allocates` — public declaration; see the call analysis contract.
+- `mr_frees` — public declaration; see the call analysis contract.
+- `mr_orders` — public declaration; see the call analysis contract.
+- `mr_contains` — public declaration; see the call analysis contract.
+- `unknown_modref` — public declaration; see the call analysis contract.
+- `modref_lattice` — public declaration; see the call analysis contract.
+- `modref_lattice_laws` — public declaration; see the call analysis contract.
+- `modref_lattice_height` — public declaration; see the call analysis contract.
+- `modref_spec` — public declaration; see the call analysis contract.
+- `effect_observer` — public declaration; see the call analysis contract.
+- `EffectObserver` — public declaration; see the call analysis contract.
+- `actual_reads` — public declaration; see the call analysis contract.
+- `actual_writes` — public declaration; see the call analysis contract.
+- `actual_allocates` — public declaration; see the call analysis contract.
+- `actual_frees` — public declaration; see the call analysis contract.
+- `actual_orders` — public declaration; see the call analysis contract.
+- `modref_covers` — public declaration; see the call analysis contract.
+- `modref_local_laws` — public declaration; see the call analysis contract.
+- `Build_modref_local_laws` — public declaration; see the call analysis contract.
+- `modref_local_step` — public declaration; see the call analysis contract.
+- `modref_sound` — public declaration; see the call analysis contract.
+
+### `AnalysesSeg.v` — ANA-14
+
+- `seg_event` — public declaration; see the SEG contract.
+- `seg_bit_transfer` — public declaration; see the SEG contract.
+- `seg_must_lattice` — public declaration; see the SEG contract.
+- `seg_index` — public declaration; see the SEG contract.
+- `SegIndex` — public declaration; see the SEG contract.
+- `seg_graph` — public declaration; see the SEG contract.
+- `seg_paths` — public declaration; see the SEG contract.
+- `seg_interiors` — public declaration; see the SEG contract.
+- `seg_forward_summary` — public declaration; see the SEG contract.
+- `seg_backward_summary` — public declaration; see the SEG contract.
+- `seg_path` — public declaration; see the SEG contract.
+- `seg_internal_nodes` — public declaration; see the SEG contract.
+- `seg_index_laws` — public declaration; see the SEG contract.
+- `seg_wf` — public declaration; see the SEG contract.
+- `seg_entries` — public declaration; see the SEG contract.
+- `seg_nodes_original` — public declaration; see the SEG contract.
+- `seg_boundaries` — public declaration; see the SEG contract.
+- `seg_junctions` — public declaration; see the SEG contract.
+- `seg_event_endpoints` — public declaration; see the SEG contract.
+- `seg_path_valid` — public declaration; see the SEG contract.
+- `seg_path_nodup` — public declaration; see the SEG contract.
+- `seg_internal_nodup` — public declaration; see the SEG contract.
+- `seg_internal_lookup` — public declaration; see the SEG contract.
+- `seg_edge_partition` — public declaration; see the SEG contract.
+- `seg_no_event_inside` — public declaration; see the SEG contract.
+- `seg_interior_unique` — public declaration; see the SEG contract.
+- `seg_interior_only` — public declaration; see the SEG contract.
+- `seg_interior_degree` — public declaration; see the SEG contract.
+- `build_expression_seg` — public declaration; see the SEG contract.
+- `seg_summary_apply` — public declaration; see the SEG contract.
+- `seg_forward_transfer` — public declaration; see the SEG contract.
+- `seg_backward_transfer` — public declaration; see the SEG contract.
+- `seg_available_system` — public declaration; see the SEG contract.
+- `seg_busy_system` — public declaration; see the SEG contract.
+- `seg_reconstruct_available` — public declaration; see the SEG contract.
+- `seg_reconstruct_busy` — public declaration; see the SEG contract.
+- `seg_available` — public declaration; see the SEG contract.
+- `seg_busy` — public declaration; see the SEG contract.
+- `seg_must_laws` — public declaration; see the SEG contract.
+- `seg_must_lub` — public declaration; see the SEG contract.
+- `seg_bit_distributive` — public declaration; see the SEG contract.
+- `build_expression_seg_correct` — public declaration; see the SEG contract.
+- `build_expression_seg_summaries` — public declaration; see the SEG contract.
+- `seg_available_exact` — public declaration; see the SEG contract.
+- `seg_busy_exact` — public declaration; see the SEG contract.
+
+
+<!-- C19 SSA PRE names -->
+
+### `AnalysesSsaPreGraph.v` — ANA-16
+
+- `pre_expression_view` — public declaration; see the SSA PRE contract.
+- `PreExpressionView` — public declaration; see the SSA PRE contract.
+- `pre_genkill` — public declaration; see the SSA PRE contract.
+- `pre_total_pure` — public declaration; see the SSA PRE contract.
+- `pre_recomputed` — public declaration; see the SSA PRE contract.
+- `pre_expr_ssa` — public declaration; see the SSA PRE contract.
+- `PreExprSsa` — public declaration; see the SSA PRE contract.
+- `pre_ssa_points` — public declaration; see the SSA PRE contract.
+- `pre_ssa_view` — public declaration; see the SSA PRE contract.
+- `pre_expression` — public declaration; see the SSA PRE contract.
+- `pre_seed_expressions` — public declaration; see the SSA PRE contract.
+- `pre_value_universe` — public declaration; see the SSA PRE contract.
+- `pre_expression_shape` — public declaration; see the SSA PRE contract.
+- `pre_operands` — public declaration; see the SSA PRE contract.
+- `pre_expr_eval` — public declaration; see the SSA PRE contract.
+- `pre_phi_translate` — public declaration; see the SSA PRE contract.
+- `pre_initial_available` — public declaration; see the SSA PRE contract.
+- `pre_exit_point` — public declaration; see the SSA PRE contract.
+- `pre_expr_in_family` — public declaration; see the SSA PRE contract.
+- `pre_family_seed` — public declaration; see the SSA PRE contract.
+- `pre_family_translate` — public declaration; see the SSA PRE contract.
+- `pre_expr_universe` — public declaration; see the SSA PRE contract.
+- `pre_phi_env` — public declaration; see the SSA PRE contract.
+- `pre_phi_operand` — public declaration; see the SSA PRE contract.
+- `pre_point_edge_index` — public declaration; see the SSA PRE contract.
+- `pre_expr_ssa_laws` — public declaration; see the SSA PRE contract.
+- `pre_expr_points` — public declaration; see the SSA PRE contract.
+- `pre_expr_strict` — public declaration; see the SSA PRE contract.
+- `pre_expr_block_graph` — public declaration; see the SSA PRE contract.
+- `pre_expr_point_graph` — public declaration; see the SSA PRE contract.
+- `pre_expr_reachable_blocks` — public declaration; see the SSA PRE contract.
+- `pre_expr_reachable_points` — public declaration; see the SSA PRE contract.
+- `pre_expr_entry_position` — public declaration; see the SSA PRE contract.
+- `pre_expr_entry_no_incoming` — public declaration; see the SSA PRE contract.
+- `pre_expr_params_nodup` — public declaration; see the SSA PRE contract.
+- `pre_expr_value_nodup` — public declaration; see the SSA PRE contract.
+- `pre_expr_occurrences` — public declaration; see the SSA PRE contract.
+- `pre_expr_initial_in_family` — public declaration; see the SSA PRE contract.
+- `pre_expr_finite_operands` — public declaration; see the SSA PRE contract.
+- `pre_expr_shape_identity` — public declaration; see the SSA PRE contract.
+- `pre_expr_shape_arity` — public declaration; see the SSA PRE contract.
+- `pre_expr_runtime` — public declaration; see the SSA PRE contract.
+- `pre_expr_operand_support` — public declaration; see the SSA PRE contract.
+- `pre_expr_kill_operand` — public declaration; see the SSA PRE contract.
+- `pre_expr_def_home` — public declaration; see the SSA PRE contract.
+- `pre_expr_cross_no_defs` — public declaration; see the SSA PRE contract.
+- `pre_expr_real_internal` — public declaration; see the SSA PRE contract.
+- `pre_expr_closed_translation` — public declaration; see the SSA PRE contract.
+- `pre_expr_translation_shape` — public declaration; see the SSA PRE contract.
+- `pre_expr_translation_operands` — public declaration; see the SSA PRE contract.
+- `pre_expr_translation_pure` — public declaration; see the SSA PRE contract.
+- `pre_expr_translation_eval` — public declaration; see the SSA PRE contract.
+- `frg_defs` — public declaration; see the SSA PRE contract.
+- `frg_phi_needed` — public declaration; see the SSA PRE contract.
+- `frg_phi_seed` — public declaration; see the SSA PRE contract.
+- `frg_phi_iter` — public declaration; see the SSA PRE contract.
+- `frg_phi_translate_seed` — public declaration; see the SSA PRE contract.
+- `frg_phi_sites` — public declaration; see the SSA PRE contract.
+- `pre_expr_universe_exact` — public declaration; see the SSA PRE contract.
+- `frg_phi_sites_exact` — public declaration; see the SSA PRE contract.
+- `pre_phi_env_parameter` — public declaration; see the SSA PRE contract.
+- `pre_point_edge_index_exact` — public declaration; see the SSA PRE contract.
+- `pre_phi_env_frame` — public declaration; see the SSA PRE contract.
+- `pre_phi_env_substitution` — public declaration; see the SSA PRE contract.
+- `frg_translation_agrees` — public declaration; see the SSA PRE contract.
+- `frg_version` — public declaration; see the SSA PRE contract.
+- `FrUnavailable` — public declaration; see the SSA PRE contract.
+- `FrInitial` — public declaration; see the SSA PRE contract.
+- `FrFresh` — public declaration; see the SSA PRE contract.
+- `FrPhi` — public declaration; see the SSA PRE contract.
+- `frg_operand` — public declaration; see the SSA PRE contract.
+- `FrgOperand` — public declaration; see the SSA PRE contract.
+- `frg_operand_version` — public declaration; see the SSA PRE contract.
+- `frg_operand_real_use` — public declaration; see the SSA PRE contract.
+- `factored_redundancy_graph` — public declaration; see the SSA PRE contract.
+- `FactoredRedundancyGraph` — public declaration; see the SSA PRE contract.
+- `frg_versions` — public declaration; see the SSA PRE contract.
+- `frg_occurrence_index` — public declaration; see the SSA PRE contract.
+- `frg_fresh_index` — public declaration; see the SSA PRE contract.
+- `frg_phi_index` — public declaration; see the SSA PRE contract.
+- `frg_phi_operands` — public declaration; see the SSA PRE contract.
+- `frg_unsafe_seeds` — public declaration; see the SSA PRE contract.
+- `frg_version_encoding` — public declaration; see the SSA PRE contract.
+- `frg_version_expr` — public declaration; see the SSA PRE contract.
+- `frg_version_point` — public declaration; see the SSA PRE contract.
+- `frg_nearest_version` — public declaration; see the SSA PRE contract.
+- `frg_no_dominating_real_use` — public declaration; see the SSA PRE contract.
+- `frg_reusable` — public declaration; see the SSA PRE contract.
+- `frg_wf` — public declaration; see the SSA PRE contract.
+- `frg_versions_nodup` — public declaration; see the SSA PRE contract.
+- `frg_versions_exact` — public declaration; see the SSA PRE contract.
+- `frg_phi_exact` — public declaration; see the SSA PRE contract.
+- `frg_occurrence_exact` — public declaration; see the SSA PRE contract.
+- `frg_occurrence_domain` — public declaration; see the SSA PRE contract.
+- `frg_fresh_exact` — public declaration; see the SSA PRE contract.
+- `frg_fresh_domain` — public declaration; see the SSA PRE contract.
+- `frg_fresh_required` — public declaration; see the SSA PRE contract.
+- `frg_operand_exact` — public declaration; see the SSA PRE contract.
+- `frg_operand_domain` — public declaration; see the SSA PRE contract.
+- `frg_operand_selection` — public declaration; see the SSA PRE contract.
+- `frg_operand_real_use_exact` — public declaration; see the SSA PRE contract.
+- `frg_down_seed_exact` — public declaration; see the SSA PRE contract.
+- `build_frg` — public declaration; see the SSA PRE contract.
+- `build_frg_wf` — public declaration; see the SSA PRE contract.
+
+### `AnalysesSsaPre.v` — ANA-15
+
+- `pre_version` — public declaration; see the SSA PRE contract.
+- `PreInitial` — public declaration; see the SSA PRE contract.
+- `PreComputed` — public declaration; see the SSA PRE contract.
+- `PreInserted` — public declaration; see the SSA PRE contract.
+- `PreMerged` — public declaration; see the SSA PRE contract.
+- `pre_version_expr` — public declaration; see the SSA PRE contract.
+- `pre_plan` — public declaration; see the SSA PRE contract.
+- `PrePlan` — public declaration; see the SSA PRE contract.
+- `pre_insertions` — public declaration; see the SSA PRE contract.
+- `pre_deletions` — public declaration; see the SSA PRE contract.
+- `pre_reload_versions` — public declaration; see the SSA PRE contract.
+- `pre_phi_versions` — public declaration; see the SSA PRE contract.
+- `pre_inserted` — public declaration; see the SSA PRE contract.
+- `pre_deleted` — public declaration; see the SSA PRE contract.
+- `pre_extended_view` — public declaration; see the SSA PRE contract.
+- `pre_version_point` — public declaration; see the SSA PRE contract.
+- `pre_version_written` — public declaration; see the SSA PRE contract.
+- `pre_phi_update` — public declaration; see the SSA PRE contract.
+- `pre_placement_legal` — public declaration; see the SSA PRE contract.
+- `ssapre_facts` — public declaration; see the SSA PRE contract.
+- `SsaPreFacts` — public declaration; see the SSA PRE contract.
+- `ssapre_downsafe` — public declaration; see the SSA PRE contract.
+- `ssapre_can_available` — public declaration; see the SSA PRE contract.
+- `ssapre_later` — public declaration; see the SSA PRE contract.
+- `live_bool_get` — public declaration; see the SSA PRE contract.
+- `ssapre_down_unsafe` — public declaration; see the SSA PRE contract.
+- `ssapre_down_seed` — public declaration; see the SSA PRE contract.
+- `ssapre_down_step` — public declaration; see the SSA PRE contract.
+- `ssapre_cannot` — public declaration; see the SSA PRE contract.
+- `ssapre_cannot_seed` — public declaration; see the SSA PRE contract.
+- `ssapre_cannot_step` — public declaration; see the SSA PRE contract.
+- `ssapre_later_reset` — public declaration; see the SSA PRE contract.
+- `ssapre_later_seed` — public declaration; see the SSA PRE contract.
+- `ssapre_later_step` — public declaration; see the SSA PRE contract.
+- `solve_ssapre` — public declaration; see the SSA PRE contract.
+- `ssa_pre_place` — public declaration; see the SSA PRE contract.
+- `solve_ssapre_exact` — public declaration; see the SSA PRE contract.
+- `ssa_pre_place_legal` — public declaration; see the SSA PRE contract.
+- `ssa_pre_phi_versions_correct` — public declaration; see the SSA PRE contract.
+
+### `AnalysesSsaPreSemantics.v` — ANA-15
+
+- `pre_origin` — public declaration; see the SSA PRE contract.
+- `PrePoint` — public declaration; see the SSA PRE contract.
+- `PreOnEdge` — public declaration; see the SSA PRE contract.
+- `pre_realizer` — public declaration; see the SSA PRE contract.
+- `PreRealizer` — public declaration; see the SSA PRE contract.
+- `pre_source` — public declaration; see the SSA PRE contract.
+- `pre_source_end` — public declaration; see the SSA PRE contract.
+- `pre_source_graph` — public declaration; see the SSA PRE contract.
+- `pre_target` — public declaration; see the SSA PRE contract.
+- `pre_target_end` — public declaration; see the SSA PRE contract.
+- `pre_target_graph` — public declaration; see the SSA PRE contract.
+- `pre_origin_of` — public declaration; see the SSA PRE contract.
+- `pre_project_edge` — public declaration; see the SSA PRE contract.
+- `pre_eval` — public declaration; see the SSA PRE contract.
+- `pre_cached` — public declaration; see the SSA PRE contract.
+- `pre_core_agree` — public declaration; see the SSA PRE contract.
+- `pre_measure` — public declaration; see the SSA PRE contract.
+- `pre_cache_agree` — public declaration; see the SSA PRE contract.
+- `pre_boundary` — public declaration; see the SSA PRE contract.
+- `pre_exit_covered` — public declaration; see the SSA PRE contract.
+- `pre_phi_source_laws` — public declaration; see the SSA PRE contract.
+- `pre_admin` — public declaration; see the SSA PRE contract.
+- `pre_finish` — public declaration; see the SSA PRE contract.
+- `pre_finish_boundary` — public declaration; see the SSA PRE contract.
+- `pre_finish_admin` — public declaration; see the SSA PRE contract.
+- `pre_macro_step` — public declaration; see the SSA PRE contract.
+- `pre_paired_run` — public declaration; see the SSA PRE contract.
+- `pre_paired_initial` — public declaration; see the SSA PRE contract.
+- `pre_paired_step` — public declaration; see the SSA PRE contract.
+- `pre_local_laws` — public declaration; see the SSA PRE contract.
+- `pre_local_graph` — public declaration; see the SSA PRE contract.
+- `pre_local_operands` — public declaration; see the SSA PRE contract.
+- `pre_local_kept` — public declaration; see the SSA PRE contract.
+- `pre_local_insert` — public declaration; see the SSA PRE contract.
+- `pre_local_replace` — public declaration; see the SSA PRE contract.
+- `pre_local_cache_frame` — public declaration; see the SSA PRE contract.
+- `pre_local_compute` — public declaration; see the SSA PRE contract.
+- `pre_local_initial` — public declaration; see the SSA PRE contract.
+- `pre_local_phi_select` — public declaration; see the SSA PRE contract.
+- `pre_local_progress` — public declaration; see the SSA PRE contract.
+- `pre_local_endings` — public declaration; see the SSA PRE contract.
+- `ssa_pre_cache_invariant` — public declaration; see the SSA PRE contract.
+- `ssa_pre_semantics` — public declaration; see the SSA PRE contract.

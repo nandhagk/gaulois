@@ -1,5 +1,37 @@
 # Gaulois.Domains
 
+## Selectable known-bit multiplication (DOM-8)
+
+`DomainsKnownBitsFast.v` adds a selectable `word_domain tnum` using the existing lattice,
+concretisation and all existing transfers except multiplication. This is a precision choice:
+it has the same soundness interface, but need not return the same abstract fact as DOM-2.
+No existing public definition or theorem changes. The multiplication is a width-bounded
+shift-and-add algorithm over tnums, processing multiplier bits from least to most significant.
+Start at the constant zero tnum. For each bit, leave the accumulator unchanged when the bit is
+known zero; add the shifted multiplicand with the DOM-2 tnum addition when it is known one;
+and join the unchanged accumulator with that sum when the bit is unknown. Truncate each shift
+and addition to the result width. A contradictory input mask returns the tnum bottom. Constants
+therefore yield the exact concrete product. Iteration uses binary fuel or a structurally bounded
+bit traversal and does not enumerate concrete operands.
+
+```coq
+Definition tnum_mul_precise (w : width) (a b : tnum) : tnum.
+Definition known_bits_precise_domain : word_domain tnum.
+(* Same fields as known_bits_domain except pforward bvmul on two operands of width rw uses
+   tnum_mul_precise; all other inputs use pforward known_bits_domain unchanged. *)
+Theorem tnum_mul_precise_sound (w : width) (a b : tnum) (x y : Z) :
+  is_word w x -> is_word w y -> tnum_gamma w a x -> tnum_gamma w b y ->
+  tnum_gamma w (tnum_mul_precise w a b) (wmul w x y).
+Theorem known_bits_precise_word_laws : word_laws known_bits_precise_domain tnum_gamma.
+Theorem tnum_mul_precise_constants (w : width) (x y : Z) :
+  tnum_mul_precise w (pconst known_bits_domain w x) (pconst known_bits_domain w y) =
+  pconst known_bits_domain w (wmul w x y).
+```
+
+The implementation proves the claims directly for all widths and the repository's total word
+semantics. It does not claim an optimal abstract multiplication or equal results to DOM-2.
+Card: DOM-8.
+
 Domains provides abstract values for machine words and for memory, all proved sound once. A
 `numeric_domain` is a record of a lattice, an abstraction of constants, a forward transfer for
 every `Bits` operator and a backward `assume` that refines operands from a known result; one
@@ -31,6 +63,7 @@ Order record. Stdlib imports (`ZArith`, `List`, `Bool`, `Sorting.Sorted`) are im
 | `DomainsInterval.v` | intervals over `Z` with infinite bounds, threshold widening, narrowing | DOM-1b |
 | `DomainsSign.v` | signs | DOM-1a |
 | `DomainsKnownBits.v` | known bits (tnum) | DOM-2 |
+| `DomainsKnownBitsFast.v` | selectable tnum multiplication | DOM-8 |
 | `DomainsWrapped.v` | wrapping intervals with a widening rank | DOM-3 |
 | `DomainsCongruence.v` | congruences | DOM-4 |
 | `DomainsProduct.v` | the reduced-product functor and its three reductions | DOM-4 |
