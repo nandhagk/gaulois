@@ -15,12 +15,13 @@ uses. The contracts specify the intended interfaces; implementation status is in
                         Collections
 ```
 
-The diagram indicates composition, not every dependency. `Bits` uses Stdlib directly; package
-contracts and their dune theories give the precise dependencies. Collections provides injective
-encodings into `positive` and canonical tries. Maps and sets hide that representation. Dictionaries
-are explicit records parameterised by their carrier types, with separate `Prop` law records and no
-global instances. This design supports typed extraction. Lattice laws require a preorder, bottom
-and upper bounds; least-upper-bound laws are separate because some domains do not have them.
+The diagram indicates composition, not every dependency. `Bits` uses Collections for encodings;
+package contracts and their dune theories give the precise dependencies. Collections provides
+injective encodings into `positive` and canonical tries. Maps and sets hide that representation.
+Dictionaries are explicit records parameterised by their carrier types, with separate `Prop` law
+records and no global instances. This design supports typed extraction. Lattice laws require a
+preorder, bottom and upper bounds; least-upper-bound laws are separate because some domains do not
+have them.
 
 ## Constraints and checking
 

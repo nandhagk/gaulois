@@ -20,6 +20,9 @@ lemma relates a result to unwrapped arithmetic, it assumes `is_word`. Stdlib imp
 `List`, `Bool`) are implicit. `Open Scope Z_scope` applies throughout; natural-number arithmetic
 uses `%nat` where needed.
 
+`encoding` is the shared record from `Gaulois.Collections.CollectionsEncoding`; Bits depends on
+`Gaulois.Collections` for `op_encoding`.
+
 ## Files
 
 | File | Contents | Card |
