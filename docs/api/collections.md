@@ -714,13 +714,18 @@ End TableLaws.
 
 ## Performance notes
 
-- A trie of `n` bindings whose codes have at most `b` bits has at most `n * b` nodes. `Trie.get`,
-  `set` and `remove` cost O(bits of the key); `Trie.combine`, `map`, `fold`, `elements`, `beq` and
-  `size` cost O(nodes). `Trie.elements` builds its list with an accumulator (no left-nested
-  append). `Trie.size` is not cached; `PQueue.size` is.
+- A trie of `n` bindings whose codes have at most `b` bits has at most `n * b` nodes. Count each
+  constructor and branch as a unit operation, separately from work done by supplied functions.
+  `Trie.get`, `set` and `remove` cost O(bits of the key); `Trie.combine`, `map`, `beq` and `size`
+  cost O(nodes), plus supplied-function work. For two inputs, nodes counts both input tries.
+  For `Trie.fold` and `Trie.elements`, let `N` be the number of visited nodes and `L` the sum of
+  the bit lengths of the emitted positive keys. Their cost is O(N + L), plus fold callback work.
+  `Trie.elements` builds its list with an accumulator (no left-nested append). `Trie.size` is not
+  cached; `PQueue.size` is.
 - `Trie.forall2` costs at most O(nodes of `t1`) and stops at the first failure; `Trie.union_with`
-  costs O(the number of node positions present in both tries), because a one-sided subtree is
-  shared in O(1). `FinSet.subset` is one `Trie.forall2` (no difference trie is built) and
+  costs O(1 + the number of node positions present in both tries), because a one-sided subtree is
+  shared in O(1). Both bounds exclude supplied-function work. `FinSet.subset` is one
+  `Trie.forall2` (no difference trie is built) and
   `FinSet.union` is one `Trie.union_with`.
 - `Map.get`, `set` and `remove` add one `encode`. Prepared index: `Map.wf`, with
   `Map.elements_sound` and `Map.elements_complete` as the agreement lemmas between the trie and the
