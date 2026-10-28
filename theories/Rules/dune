@@ -1,0 +1,5 @@
+(rocq.theory
+ (name Gaulois.Rules)
+ (package gaulois)
+ (flags :standard -w +default)
+ (theories Stdlib Gaulois.Collections Gaulois.Order Gaulois.Fixpoint))

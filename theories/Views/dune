@@ -1,0 +1,12 @@
+(rocq.theory
+ (name Gaulois.Views)
+ (package gaulois)
+ (flags :standard -w +default)
+ (theories
+  Stdlib
+  Gaulois.Collections
+  Gaulois.Order
+  Gaulois.Graph
+  Gaulois.Fixpoint
+  Gaulois.Bits
+  Gaulois.Domains))

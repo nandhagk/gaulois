@@ -1,0 +1,15 @@
+_build/
+/build/
+/run/
+result
+result-*
+*.vo
+*.vos
+*.vok
+*.glob
+.*.aux
+.lia.cache
+.nia.cache
+.nra.cache
+.direnv/
+.envrc

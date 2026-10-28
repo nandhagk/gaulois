@@ -1,0 +1,19 @@
+; Example-only theories checked by computation. A test of package P lives in tests/P/ and becomes
+; the module Gaulois.Tests.P.<File>.
+
+(include_subdirs qualified)
+
+(rocq.theory
+ (name Gaulois.Tests)
+ (flags :standard -w +default)
+ (theories
+  Stdlib
+  Gaulois.Collections
+  Gaulois.Order
+  Gaulois.Graph
+  Gaulois.Bits
+  Gaulois.Fixpoint
+  Gaulois.Rules
+  Gaulois.Domains
+  Gaulois.Views
+  Gaulois.Analyses))

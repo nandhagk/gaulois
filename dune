@@ -1,0 +1,16 @@
+; Build outputs and the private run notes are not source directories.
+
+(dirs :standard \ build run)
+
+; Every OCaml module compiles with all warnings on and fatal, and a deprecated name fails the build.
+; Three warnings are off because the code style uses what they flag:
+; - 40 and 42 flag a record field or constructor named through a type annotation without opening
+;   its module, such as `({ stack; heap } : Config.t)`.
+; - 44 flags an `open` that hides names already in scope, such as `open Core` hiding `List`.
+; The release profile still runs the inline tests of every library.
+
+(env
+ (_
+  (flags
+   (:standard -w +a-40-42-44 -warn-error +a -alert ++deprecated))
+  (inline_tests enabled)))

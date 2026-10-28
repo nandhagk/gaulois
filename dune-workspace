@@ -1,0 +1,6 @@
+(lang dune 3.23)
+
+; The root dune file sets every OCaml warning flag itself, so the release profile keeps the same
+; fatal warnings as development builds.
+
+(profile release)

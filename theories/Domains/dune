@@ -1,0 +1,5 @@
+(rocq.theory
+ (name Gaulois.Domains)
+ (package gaulois)
+ (flags :standard -w +default)
+ (theories Stdlib Gaulois.Collections Gaulois.Order Gaulois.Bits))
