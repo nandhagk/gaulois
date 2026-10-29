@@ -425,8 +425,10 @@ Definition sparse_of_numeric {A K C} (ND : numeric_domain A) (G : concretisation
    (lat ND)) = false` when c is not a word; top_fact = top; op_abs o fs = abs_eval ND (fun i =>
    nth i fs top) e when op_expr br o = Some e, and top otherwise; assume_value (GConst c) a =
    meet ND a (of_const ND w z) for to_word br c = Some (w, z), and the identity for the other
-   guards; assume_args o b fs = the arguments refined by abs_assume ND (fun i => nth i fs top) e
-   (the fact of the truth value b at the result width of e), read back at 0 to n - 1 *)
+   guards. For assume_args o b fs, if op_expr br o = None, return fs. Otherwise let e be the
+   expression and env i = nth i fs top. Let t = Bits.App bvne [e; Bits.App bvxor [e; e]].
+   Apply abs_assume ND env t (of_const ND 1%positive (if b then 1 else 0)), and read back
+   indices 0 through length fs - 1, in order. The result has the same length as fs. *)
 Definition numeric_problem {S O N E V K C A} (ND : numeric_domain A) (G : concretisation A word)
     (br : op_bridge K C) (top : A) (sv : ssa_view S O N E V K C) (vals : list V)
     (entry : V -> A) : sparse_problem S O N E V K C A :=
@@ -1523,7 +1525,9 @@ Theorem numeric_value_sound {S O N E V K C A} (EN : encoding N) (EV : encoding V
 Proof idea: the first unfolds the adapter: `op_sound` is the domain's abstract-operator soundness
 composed with the bridge equation (`bridge_eq` gives the `Bits` result, `bridge_word` the
 `is_word` premises of the domain), `top_sound` is the `top` premise, `assume_args_sound` is
-`abs_assume_sound` and `bridge_truth` ties the truth value of a result to the word; the second is
+`abs_assume_sound` and `bridge_truth` ties the truth value of a result to the word. Successful
+evaluation of `e` yields a normalized word; its xor with itself is zero at the same width, so
+`t` returns the corresponding one-bit truth value. The second theorem is
 `sparse_sound` with that domain. Card: ANA-3.
 
 ```coq

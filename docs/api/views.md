@@ -675,7 +675,7 @@ Record ssa_view_laws {S O N E V K C} (m : semantics S O) (sv : ssa_view S O N E 
 }.
 
 (* The domain a sparse analysis runs over. `assume_value` refines a fact by a guard on that
-   value; `assume_args o b fs` refines the argument facts of a comparison `o` given that it
+   value; `assume_args o b fs` refines the argument facts of an operator `o` given that it
    returned the truth value b. Analyses builds one from a numeric domain of Domains, a bridge
    from the operators to Bits and a `top`. *)
 Record sparse_domain (A C K : Type) : Type := SparseDomain {
