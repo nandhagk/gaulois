@@ -223,7 +223,9 @@ Definition ssa_nan_demand_view (ext : nat -> list cval -> option cval) (P : prog
    ssa_block_view ext P f:
    for o = OExt tag with float_ext_decode tag = Some (_, b) and args = [a1; a2], the pairs
    (a1, d1) and (a2, d2) with (d1, d2) = nan_back b d; for every other operator,
-   the arguments with Demanded true true; for a Param or an Arbitrary definition, nothing.
+   the arguments with Demanded true true. For a Param definition and demand d = Demanded sg pl,
+   map each pair (y, _) in dback (ssa_demand_view ext P f) e x true to (y, d), preserving
+   its order and duplicates. For an Arbitrary definition, return nothing.
    Omitting bottom pairs preserves their semantic demand contribution and establishes d_back_bot;
    the separate dnec demands retain OExt trap-shape observations. Prove d_vars for every node,
    including unreachable blocks, and use full-demand option equality for d_exits. *)
