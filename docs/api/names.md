@@ -3585,6 +3585,8 @@ REW-7 owns the independent Order, SSA and word clients.
 - `pre_local_laws` — public declaration; see the SSA PRE contract.
 - `pre_local_graph` — public declaration; see the SSA PRE contract.
 - `pre_local_operands` — public declaration; see the SSA PRE contract.
+- `pre_local_gen_value` — public declaration; see the SSA PRE contract.
+- `pre_local_kill_frame` — public declaration; see the SSA PRE contract.
 - `pre_local_kept` — public declaration; see the SSA PRE contract.
 - `pre_local_insert` — public declaration; see the SSA PRE contract.
 - `pre_local_replace` — public declaration; see the SSA PRE contract.

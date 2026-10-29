@@ -4982,6 +4982,8 @@ target states and the specific edge being executed:
    kept operation and the values observed at endings. If operands agree, `pre_eval` agrees.
    `pre_recomputed v e = Some u` means the original edge computes precisely that expression,
    its result is the source definition, and `u` is in `gen e`.
+   On an actual source step from a reachable state, a generated expression retains its
+   pre-step value, as does an expression whose kill flag on the taken edge is false.
 3. **Kept primitive.** If an edge is not deleted, related boundary states with the required
    input operands can take matching original and target edge primitives in both directions,
    producing the same event list and core-agreeing results. The primitive updates exactly the
@@ -5008,7 +5010,12 @@ target states and the specific edge being executed:
    `pre_cache_agree`. Source and target state invariants are preserved by their own steps.
 
 The fields below are client obligations about individual graph edges and primitive actions.
-They do not assume source and target behavior equality.
+They do not assume source and target behavior equality. `pre_local_gen_value` and
+`pre_local_kill_frame` are the source value clauses of ANA-1's `genkill_laws`, restricted to
+reachable states and actual taken steps. They supply the source stability needed when a cache
+value is computed or carried past an edge. The record does not require the full `genkill_laws`,
+whose `final_exit` field would add a separate restriction. Every concrete client proves both
+source value fields for its own semantics.
 
 ```coq
 Record pre_local_laws {S O B BE N E NT ET V K U C} (EBE : encoding BE)
@@ -5038,6 +5045,14 @@ Record pre_local_laws {S O B BE N E NT ET V K U C} (EBE : encoding BE)
     (forall s u, reachable_state (pre_source r) s -> pre_total_pure v u = true ->
       exists c, pre_eval r s u = Some c) /\
     (forall e u, pre_recomputed v e = Some u -> In u (gen (pre_genkill v) e));
+  pre_local_gen_value : forall s l s' e u,
+    reachable_state (pre_source r) s -> step (pre_source r) s l s' ->
+    taken (pre_source_graph r) s l s' e -> In u (gen (pre_genkill v) e) ->
+    uval (pre_genkill v) s' u = uval (pre_genkill v) s u;
+  pre_local_kill_frame : forall s l s' e u,
+    reachable_state (pre_source r) s -> step (pre_source r) s l s' ->
+    taken (pre_source_graph r) s l s' e -> kill (pre_genkill v) e u = false ->
+    uval (pre_genkill v) s' u = uval (pre_genkill v) s u;
   pre_local_kept : forall s t e,
     reachable_state (pre_source r) s -> reachable_state (pre_target r p) t ->
     point (pre_source_graph r) s = Graph.source (cfg (pre_source_graph r)) e ->
@@ -5144,11 +5159,12 @@ Theorem ssa_pre_semantics {S O B BE N E NT ET V K U C} (EB : encoding B) (EBE : 
 ```
 
 The proof must establish placement legality, extend the finite availability invariant along
-each projected edge, derive the local kept/insert/replace/phi cases and construct the macro
-target view on the original graph. Apply `agreement_simulation2` to the source and macro view;
-compose with `stuttering_same_behaviour` for the bounded administrative refinement to the real
-target. Supply both explicit stuck matches: `pre_local_endings` covers related boundary states,
-and `pre_local_progress` provides a step at each administrative state and a decreasing measure
+each projected edge using the source value fields, derive the local kept/insert/replace/phi
+cases and construct the macro target view on the original graph. Apply `agreement_simulation2`
+to the source and macro view; compose with `stuttering_same_behaviour` for the bounded
+administrative refinement to the real target. Supply both explicit stuck matches:
+`pre_local_endings` covers related boundary states, and `pre_local_progress` provides a step at
+each administrative state and a decreasing measure
 to construct a finite silent path to a boundary. Progress alone does not establish that the
 boundary is related to the required source state. Prove the matching relation and endpoint
 conditions for the same path, accounting for every nondeterministic administrative choice; if
@@ -5157,3 +5173,8 @@ Equal events, endings including traps and resource stops, finite prefixes and di
 are required. A client may only discharge totality and resource neutrality with actual laws for
 its semantics; the placement proof itself cannot establish them. The local laws are proof
 obligations for a concrete client, not an implementation result.
+
+A source edge that changes an expression despite a false kill flag can leave a cached value
+stale. The source value fields exclude this mutation and preserve generated values across the
+actual step. They do not establish the full theorems or discharge the independent same-path
+administrative coupling obligation above.
