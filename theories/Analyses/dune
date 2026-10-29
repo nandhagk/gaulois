@@ -10,5 +10,6 @@
   Gaulois.Bits
   Gaulois.Fixpoint
   Gaulois.Rules
+  Gaulois.Rewrite
   Gaulois.Domains
   Gaulois.Views))
