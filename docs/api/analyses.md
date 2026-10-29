@@ -151,6 +151,10 @@ Definition reach_set {S O N E X Cv} (EX : encoding X) (EE : encoding E)
 Definition reach_lattice {S O N E X Cv} (EX : encoding X) (EE : encoding E)
     (vv : var_view S O N E X Cv) : lattice (reach_set EX EE vv) :=
   finite_powerset_lattice (pair_encoding EX EE) (reach_universe EX EE vv).
+(* This body is the reference equation, not a required definitional equation. The executable
+   transfer captures FinSet.of_list EX (defs vv e) before filtering the fact and uses membership
+   in that set for each pair. Prove pointwise equality with this entire finite_set result for
+   every vv, e and a, including unlisted edges and raw views. *)
 Definition reaching_transfer {S O N E X Cv} (EX : encoding X) (EE : encoding E)
     (vv : var_view S O N E X Cv) (e : E) (a : reach_set EX EE vv) : reach_set EX EE vv :=
   finite_clamp (pair_encoding EX EE) (reach_universe EX EE vv)
@@ -162,6 +166,14 @@ Definition reaching_system {S O N E X Cv} (EX : encoding X) (EE : encoding E)
   System.t N (dense_constraint N E) (reach_set EX EE vv) :=
   forward_system (cfg (gview vv)) (fun _ => bot (reach_lattice EX EE vv))
     (reaching_transfer EX EE vv).
+(* This system body is also a reference equation, using the transfer reference body above.
+   The executable system prepares an EE-keyed
+   index of kill sets for the graph's edges once before constructing its callbacks, and retains
+   that index across queries. For an edge absent from the index, its callback prepares the kill
+   set from defs vv e. Thus arbitrary Flow rows retain the reference behavior. Prove equality
+   of constraint lists, pointwise targets, and Query.run results for every row and assignment
+   against this reference system. The result and both ordered traces are preserved, without
+   functional extensionality. The public signatures and semantic theorem premises are unchanged. *)
 (* Composition. Domain: finite_powerset_lattice over pair_encoding EX EE and reach_universe.
    Engine: solve_total, Joining, forward_static. Scheduler: rpo_scheduler. *)
 
@@ -549,13 +561,18 @@ Definition closed_system {S O N E X Cv M} (EX : encoding X) (DD : demand_domain 
 (* constraints = map Seed (nodes g) ++ map Flow (edges_of g), g = cfg (dgraph dv); the target of
    every constraint is tt; rhs (Seed n) = Query.Ret (the seed of the backward system at n);
    rhs (Flow e) = Query.Ask tt (fun a => Query.Ret (demand_transfer EX DD dv e a)) *)
-(* Dead values: with M = bool, a value is dead when no closed demand needs it. *)
+(* Boolean dead values are absent from the computed closed demand, which is least under
+   strictness. *)
 Definition bool_demand {Cv} : demand_domain bool Cv :=
   DemandDomain bool_lattice bool_agree.   (* agree b u v := b = true -> u = v *)
 Definition needed_values {S O N E X Cv} (EX : encoding X) (dv : demand_view S O N E X Cv bool) :
   finite_map EX (dvars dv) bool.
-(* the value at tt of solve_total on closed_system: the least closed demand, seeded by dnec and
-   dexit and closed under dback; a worklist *)
+(* A total inflationary worklist computes a closed demand for every view and the least closed
+   demand under the premise of needed_values_least. It handles duplicate variables by a
+   deduplicated finite index while returning the original finite_map carrier. The implementation
+   may index node and edge occurrences of closed_system without encodings of N or E. Prove that
+   the indexed constraints have exactly the same post-solutions as closed_system. Build indexes
+   once. *)
 Definition dead_value {S O N E X Cv} (EX : encoding X) (dv : demand_view S O N E X Cv bool)
     (x : X) : bool := negb (dget EX bool_lattice (needed_values EX dv) x).
 (* Demanded bits: M is a Domains bit mask, dback is its backward transfer per operator, and
@@ -650,9 +667,10 @@ Record adce_input (N E : Type) : Type := AdceInput {
   may_not_terminate : N -> bool      (* the node lies in a loop that may not terminate *)
 }.
 Definition adce_marked {N E} (EN : encoding N) (ai : adce_input N E) : FinSet.t N.
-(* the least set M with: effectful_node n -> n in M; n in M and cdep (agraph ai) (aexits ai) b n ->
-   b in M; may_not_terminate n -> n in M; computed by a worklist over the reverse control
-   dependences *)
+(* The least set M supported on Graph.nodes (agraph ai) with: an effectful or possibly
+   nonterminating listed node is in M; and a listed b is in M when a listed n is in M and n is
+   control dependent on b. Compute it with a worklist over reverse control dependences under the
+   premises of adce_closed and adce_least. Build the control-dependence index once. *)
 Definition skips_to {N E} (g : Graph.t N E) (marked : N -> bool) (n m : N) : Prop :=
   marked m = true /\ exists es, path g n es m /\
     forall e, In e es -> Graph.target g e = m \/ marked (Graph.target g e) = false.
@@ -1556,6 +1574,7 @@ Theorem needed_values_closed {S O N E X Cv} (EX : encoding X) (dv : demand_view 
   demand_closed EX bool_demand dv (needed_values EX dv).
 Theorem needed_values_least {S O N E X Cv} (EX : encoding X) (dv : demand_view S O N E X Cv bool)
     (d : finite_map EX (dvars dv) bool) :
+  (forall e x, dback dv e x false = nil) ->
   demand_closed EX bool_demand dv d ->
   leb (demand_lattice EX bool_demand dv) (needed_values EX dv) d = true.
 (** A step of an instruction that is not effectful emits no event, leaves the heap alone, keeps the
@@ -1573,7 +1592,10 @@ Proof idea: `demand_sound` by `agreement_same_behaviour` with `R := fun _ => dem
 post-solution and `agreement_bisimulation` holds for every pair of `inv` states at one point;
 `dead_value_removable` because agreement at `bot` is trivial (`d_bot_agrees`); the closed system by
 unfolding both post-solution predicates (`Query.eval` of `Ask tt` is the value at `tt`); the least
-demand by induction on the worklist (it is the least fixed point of the transfer seeds); the last
+demand by induction on the worklist. Inflationary joining and finite height give closure even for
+nonmonotone transfers. Boolean strictness makes each N3 contribution monotone: the false case is
+empty and the true case is fixed. Prove the indexed constraints agree with the one-unknown system,
+including on raw graphs and duplicate variable lists, and preserve the least closed demand; the last
 unfolds `effectful` and uses `silent`, `frame_frame`, `heap_frame`, `stop_covered` and
 `trap_covered`. Pfenning's factorial example (z live but not needed) is `Examples`' instantiation.
 Card: ANA-4.
@@ -1623,30 +1645,45 @@ graph (`er_cfg`), so both steps reach one point (`taken_edge`). This justifies d
 `z <- z + 1` in Pfenning's example. Card: ANA-4.
 
 ```coq
-(** ADCE marking: effects are kept, control dependences are kept, divergence is kept, and the
-    marked set is the least such set. *)
+(** On the listed nodes, effects, control dependences and possible divergence are kept; the
+    marked set is supported on those nodes and is the least set closed under these rules. *)
 Theorem adce_closed {N E} (EN : encoding N) (ai : adce_input N E) :
-  (forall n, effectful_node ai n = true -> FinSet.mem EN n (adce_marked EN ai) = true) /\
-  (forall b n, FinSet.mem EN n (adce_marked EN ai) = true -> cdep (agraph ai) (aexits ai) b n ->
+  ready EN (agraph ai) (prepare EN (agraph ai)) ->
+  incl (aexits ai) (Graph.nodes (agraph ai)) -> exits_reachable (agraph ai) (aexits ai) ->
+  (forall n, FinSet.mem EN n (adce_marked EN ai) = true -> In n (Graph.nodes (agraph ai))) /\
+  (forall n, In n (Graph.nodes (agraph ai)) -> effectful_node ai n = true ->
+     FinSet.mem EN n (adce_marked EN ai) = true) /\
+  (forall b n, In b (Graph.nodes (agraph ai)) -> In n (Graph.nodes (agraph ai)) ->
+     FinSet.mem EN n (adce_marked EN ai) = true -> cdep (agraph ai) (aexits ai) b n ->
      FinSet.mem EN b (adce_marked EN ai) = true) /\
-  (forall n, may_not_terminate ai n = true -> FinSet.mem EN n (adce_marked EN ai) = true).
+  (forall n, In n (Graph.nodes (agraph ai)) -> may_not_terminate ai n = true ->
+     FinSet.mem EN n (adce_marked EN ai) = true).
 Theorem adce_least {N E} (EN : encoding N) (ai : adce_input N E) (M : FinSet.t N) :
-  (forall n, effectful_node ai n = true -> FinSet.mem EN n M = true) ->
-  (forall b n, FinSet.mem EN n M = true -> cdep (agraph ai) (aexits ai) b n ->
+  ready EN (agraph ai) (prepare EN (agraph ai)) ->
+  incl (aexits ai) (Graph.nodes (agraph ai)) -> exits_reachable (agraph ai) (aexits ai) ->
+  (forall n, In n (Graph.nodes (agraph ai)) -> effectful_node ai n = true ->
+     FinSet.mem EN n M = true) ->
+  (forall b n, In b (Graph.nodes (agraph ai)) -> In n (Graph.nodes (agraph ai)) ->
+     FinSet.mem EN n M = true -> cdep (agraph ai) (aexits ai) b n ->
      FinSet.mem EN b M = true) ->
-  (forall n, may_not_terminate ai n = true -> FinSet.mem EN n M = true) ->
+  (forall n, In n (Graph.nodes (agraph ai)) -> may_not_terminate ai n = true ->
+     FinSet.mem EN n M = true) ->
   forall n, FinSet.mem EN n (adce_marked EN ai) = true -> FinSet.mem EN n M = true.
-(** An unmarked node has a unique next marked node, so removing it cannot change which marked
-    node runs next. *)
+(** Every path from a listed unmarked node that first reaches a marked node reaches the same one. *)
 Theorem adce_skip_unique {N E} (EN : encoding N) (ai : adce_input N E) (n m1 m2 : N) :
-  graph_wf (agraph ai) -> exits_reachable (agraph ai) (aexits ai) ->
+  ready EN (agraph ai) (prepare EN (agraph ai)) ->
+  incl (aexits ai) (Graph.nodes (agraph ai)) -> exits_reachable (agraph ai) (aexits ai) ->
   (forall x, In x (aexits ai) -> FinSet.mem EN x (adce_marked EN ai) = true) ->
+  In n (Graph.nodes (agraph ai)) ->
   FinSet.mem EN n (adce_marked EN ai) = false ->
   skips_to (agraph ai) (fun x => FinSet.mem EN x (adce_marked EN ai)) n m1 ->
   skips_to (agraph ai) (fun x => FinSet.mem EN x (adce_marked EN ai)) n m2 -> m1 = m2.
 ```
-Proof idea: closure and leastness by the worklist invariant (the worklist computes the least set
-closed under the three rules); if two out-paths of unmarked nodes first reach distinct marked nodes,
+Proof idea: `ready` includes graph well-formedness and duplicate-free outgoing lists. Derive the
+reverse graph's readiness from `reverse_graph_ready` and the exactness check from
+`dominator_exact_true`. Use these with `control_deps_exact` to relate the prepared index to
+`cdep`. Prove support, closure and leastness by the worklist
+invariant. If two out-paths of unmarked nodes first reach distinct marked nodes,
 one of them is control dependent on a node of the walk, which closure would have marked (Cytron et
 al.'s argument, from `GraphControlDependence`). The statement does not claim that a deletion
 preserves behaviour: the erasure of `dce_sound` does. Card: ANA-4.

@@ -2155,8 +2155,8 @@ Contract: [Examples](examples.md).
 - `reach_universe` — Definition; Finite universe of variable and defining-edge pairs.
 - `reach_set` — Definition; Finite reaching-definition fact.
 - `reach_lattice` — Definition; Lattice of reaching definitions.
-- `reaching_transfer` — Definition; Kills old definitions and generates edge definitions.
-- `reaching_system` — Definition; Forward constraints for reaching definitions.
+- `reaching_transfer` — Definition; Indexed transfer equal to the reaching-definition reference.
+- `reaching_system` — Definition; Indexed forward constraints equal to the reference observations.
 - `zero_lattice` — Definition; Must lattice of variables zero since entry.
 - `zero_since_entry_system` — Definition; Forward constraints for zero-since-entry facts.
 - `copy_view` — Record; Describes variable copies along graph edges.
@@ -2301,7 +2301,7 @@ Contract: [Examples](examples.md).
 - `demand_closed` — Definition; A demand closed under the backward transfer and exit seeds.
 - `closed_system` — Definition; Single-unknown constraint system for demand closure.
 - `bool_demand` — Definition; Boolean demand domain for neededness.
-- `needed_values` — Definition; Least closed Boolean demand for the view.
+- `needed_values` — Definition; Closed Boolean demand, least under its stated strictness premise.
 - `dead_value` — Definition; Tests whether a value is absent from the needed demand.
 - `observable_bits_view` — Definition; Specialises demand propagation to observable bit masks.
 - `erasure` — Record; Relates an original graph to an erased program.
@@ -2340,10 +2340,10 @@ Contract: [Examples](examples.md).
 - `aexits` — Field; Exit nodes used for control dependence.
 - `effectful_node` — Field; Marks a node with an observable effect.
 - `may_not_terminate` — Field; Marks a node whose loop may diverge.
-- `adce_marked` — Definition; Least set of nodes retained by aggressive dead-code marking.
+- `adce_marked` — Definition; Node-supported marking, least and closed under its stated premises.
 - `skips_to` — Definition; An unmarked path reaches a marked node without earlier marked nodes.
-- `adce_closed` — Theorem; Marked nodes satisfy the aggressive dead-code closure rules.
-- `adce_least` — Theorem; Marked nodes are the least set closed under the marking rules.
+- `adce_closed` — Theorem; Marked nodes have node support and satisfy scoped closure rules.
+- `adce_least` — Theorem; Marked nodes are least under the scoped marking rules.
 - `adce_skip_unique` — Theorem; Unmarked paths have a unique first marked successor.
 
 ### `AnalysesNumbering.v` — ANA-5

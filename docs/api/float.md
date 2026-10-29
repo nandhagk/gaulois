@@ -151,8 +151,8 @@ Definition nan_back (o : fbop) (d : nan_demand) : nan_demand * nan_demand.
    sign or of the payload, Demanded true _ or Demanded _ true, gives Demanded true true on both
    operands, because the choice between two NaN operands depends on both of their signs and
    payloads; Demanded false false gives Demanded false false on both. For FLt the result is an
-   integer, demanded exactly, and any demand gives Demanded false false on both: a comparison sees
-   whether an operand is NaN and nothing else about it. *)
+   integer, demanded exactly, and any Demanded value gives Demanded false false on both: a
+   comparison sees whether an operand is NaN and nothing else about it. *)
 ```
 
 ```coq
@@ -215,10 +215,13 @@ Definition ssa_nan_demand_view (ext : nat -> list cval -> option cval) (P : prog
    the demand Demanded true true, since their bit patterns are observable or steer control; and
    the operands of an IOp with OExt, which may trap on the shape of its operands, with
    Demanded false false. dexit n likewise, with Demanded true true.
-   dback e x d, for def x = Op o args in ssa_block_view ext P f: for o = OExt tag with
-   float_ext_decode tag = Some (_, b) and args = [a1; a2], the pairs (a1, d1) and (a2, d2) with
-   (d1, d2) = nan_back b d; for every other operator, the arguments with Demanded true true when d
-   is not NotDemanded and nothing otherwise; for a Param or an Arbitrary definition, nothing *)
+   dback e x NotDemanded = nil. For a demanded result and def x = Op o args in
+   ssa_block_view ext P f:
+   for o = OExt tag with float_ext_decode tag = Some (_, b) and args = [a1; a2], the pairs
+   (a1, d1) and (a2, d2) with (d1, d2) = nan_back b d; for every other operator,
+   the arguments with Demanded true true; for a Param or an Arbitrary definition, nothing.
+   Omitting bottom pairs preserves their semantic demand contribution and establishes d_back_bot;
+   the separate dnec demands retain OExt trap-shape observations. *)
 ```
 
 ## Theorems
@@ -353,13 +356,14 @@ Theorem ssa_nan_demand_view_laws (P : program) (f : func) :
 (** NaN observability on Ssa: two activation states that differ only in the payload and sign of
     NaNs that nothing observes behave the same. *)
 Theorem ssa_nan_demand_sound (P : program) (f : func)
-    (sigma : (label * nat) -> Map.t vid nan_demand) (s0 t0 : astate) :
+    (sigma : (label * nat) ->
+      finite_map var_encoding (dvars (ssa_nan_demand_view fx P f)) nan_demand) (s0 t0 : astate) :
   wf_program P ->
-  post_solution (pointwise_lattice var_encoding (dlat nan_domain_ssa))
+  post_solution (demand_lattice var_encoding nan_domain_ssa (ssa_nan_demand_view fx P f))
     (demand_system var_encoding nan_domain_ssa (ssa_nan_demand_view fx P f)) sigma ->
   initial (activation fx P f) s0 -> initial (activation fx P f) t0 ->
   point (dgraph (ssa_nan_demand_view fx P f)) t0 = point (dgraph (ssa_nan_demand_view fx P f)) s0 ->
-  agree (demand_agreement var_encoding nan_domain_ssa (dlookup (ssa_nan_demand_view fx P f)))
+  agree (demand_agreement var_encoding nan_domain_ssa (ssa_nan_demand_view fx P f))
     (sigma (point (dgraph (ssa_nan_demand_view fx P f)) s0)) s0 t0 ->
   same_behaviour (activation fx P f) (activation_endings fx P f) s0
     (activation fx P f) (activation_endings fx P f) t0.

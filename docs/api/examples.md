@@ -566,6 +566,9 @@ Definition const_conc : concretisation (tagged (flat Z)) word := tagged_gamma co
    lcm_avail, lcm_busy prog: the solutions of solve_total for available_system and busy_system of
    while_genkill_view prog word_stores; lcm_avail2 prog r: the availability solution of the view
    whose gen also lists the expressions that r inserts *)
+(* Neededness closure is unconditional; leastness requires empty dback at false. EX-4 and EX-5a
+   establish that premise wherever their clients use leastness. The total wrappers remain defined
+   on their existing inputs; semantic soundness retains its separate view-law premises. *)
 Definition liveness_at (P : program) (pt : label * nat) :
   live_set var_encoding (ssa_var_view (fun _ _ => None) P 0).
 Definition while_live_at (prog : stmt) (n : skel_point) :
