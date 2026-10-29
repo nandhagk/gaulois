@@ -17,4 +17,5 @@
   Gaulois.Rewrite
   Gaulois.Domains
   Gaulois.Views
-  Gaulois.Analyses))
+  Gaulois.Analyses
+  Gaulois.Examples))
