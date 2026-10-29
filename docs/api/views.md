@@ -766,9 +766,9 @@ Definition edge_feasible {S O N E V K C A} (EV : encoding V)
 (* ViewsDominated.v *)
 (* From Graph (GRA-2): `dominates g d n` (every entry path to n visits d), `strictly_dominates`
    and `edge_dominates g e n` (every entry path to n contains the edge e), over `path g n es n'`. *)
-(* Strict SSA: a value changes only where it is defined; a guard value is defined in a block that
-   dominates the guarded edge's source; and the arguments of an operation are defined in blocks
-   that dominate its block. With `guard_op_defined` this gives the one SSA equation lemma,
+(* Strict SSA: a value is unchanged away from its defining block; a guard value is defined in a
+   block that dominates the guarded edge's source; the arguments of an operation are defined in
+   blocks that dominate its block. With `guard_op_defined` this gives the one SSA equation lemma,
    `dominated_guard_holds`, on which sparse refinement at dominated uses and the analyses that
    read operand values at dominated uses rest. *)
 Record strict_ssa_laws {S O N E V K C} (m : semantics S O) (sv : ssa_view S O N E V K C) : Prop := {
@@ -776,6 +776,12 @@ Record strict_ssa_laws {S O N E V K C} (m : semantics S O) (sv : ssa_view S O N 
     stays (base sv) s l s' -> val sv s' x <> val sv s x -> point (base sv) s = home sv x;
   redefine_on_edge : forall s l s' e x, reachable_state m s -> step m s l s' ->
     taken (base sv) s l s' e -> val sv s' x <> val sv s x -> home sv x = point (base sv) s';
+  frame_in_stay : forall s l s' x, reachable_state m s -> step m s l s' ->
+    stays (base sv) s l s' -> point (base sv) s <> home sv x ->
+    val sv s' x = val sv s x;
+  frame_on_edge : forall s l s' e x, reachable_state m s -> step m s l s' ->
+    taken (base sv) s l s' e -> home sv x <> point (base sv) s' ->
+    val sv s' x = val sv s x;
   guard_home : forall e cd, In e (edges_of (cfg (base sv))) -> In cd (edge_guard sv e) ->
     dominates (cfg (base sv)) (home sv (subject cd)) (Graph.source (cfg (base sv)) e);
   op_args_dominate : forall x o args y, def sv x = Op o args -> In y args ->
@@ -1473,12 +1479,16 @@ occurrence of `e`, at a reachable state `s1` that takes `e`. At `s1`, `guards_ok
 `guard_op_defined` give the guards and the equations. After that last `e` the path visits no node
 that dominates `Graph.source e`: the shortest entry path to such a node avoids `e`, because the
 node dominates the source of `e`, and followed by the rest of the path it would reach the point of
-`s` without `e`. By `redefine_in_stay` and `redefine_on_edge` no value whose home dominates the
-source of `e` changes from `s1` to `s`. Those homes include the homes of the guard subjects
-(`guard_home`) and of their arguments (`op_args_dominate` with the transitivity of `dominates`),
+`s` without `e`. By the positive frame obligations `frame_in_stay` and `frame_on_edge`,
+every value whose home dominates the source of `e` is unchanged from `s1` to `s`. These fields
+provide equality constructively, without deciding equality on concrete values. Those homes include
+the homes of the guard subjects (`guard_home`) and of their arguments (`op_args_dominate` with
+the transitivity of `dominates`),
 so every fact established at `s1` holds at `s`. The visited nodes include the successor of `s1`, so
 an edge that returns to a node dominating its own source, a self-loop included
-(`self_loop_not_edge_dominating` of GRA-2), cannot dominate the point of `s`. Card: VIEW-5.
+(`self_loop_not_edge_dominating` of GRA-2), cannot dominate the point of `s`. This is a proof
+outline: the statement provides no equality decision for arbitrary nodes or edges, so a constructive
+proof must justify the last-occurrence argument without assuming one. Card: VIEW-5.
 
 ```coq
 (** The dominating edges returned by the dominator-tree walk really dominate. *)

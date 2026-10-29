@@ -1346,6 +1346,7 @@ Contract: [Examples](examples.md).
 
 - `strict_ssa_laws` — Record; redefinitions and operands obey SSA dominance restrictions.
 - `redefine_in_stay`, `redefine_on_edge` — Fields; value changes occur at their defining blocks.
+- `frame_in_stay`, `frame_on_edge` — Fields; values are unchanged away from their homes.
 - `guard_home`, `op_args_dominate` — Fields; guard and operand definitions dominate their uses.
 - `dom_context`, `DomContext` — Record, constructor; prepared graph and dominance indexes.
 - `dc_graph`, `dc_encoding`, `dc_prepared`, `dc_tree`, `dc_index` — Fields; dominance

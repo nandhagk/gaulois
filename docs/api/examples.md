@@ -943,8 +943,9 @@ Theorem activation_lifting (ext : nat -> list cval -> option cval) (P : program)
       subtrace trf tr.
 ```
 Proof idea: strictness uses the well-formedness (definitions dominate uses, each value defined once,
-so `redefine_in_stay` holds because only `IOp`, `ILoad` and `IAlloc` bind, at their own block, and
-`redefine_on_edge` because only a jump binds parameters, of its target; `op_args_dominate` and
+so `redefine_in_stay` and `frame_in_stay` hold because only `IOp`, `ILoad` and `IAlloc` bind, at
+their own block; `redefine_on_edge` and `frame_on_edge` hold because only a jump binds parameters,
+of its target. `op_args_dominate` and
 `guard_home` are dominance of operands and of guard subjects). The lifting is by induction on
 `exec`, call by call and return by return: a step of the innermost frame is a step of its
 activation (loads, allocations and call results are arbitrary there, and the callee's
