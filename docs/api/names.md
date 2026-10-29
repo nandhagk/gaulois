@@ -3592,8 +3592,10 @@ REW-7 owns the independent Order, SSA and word clients.
 ### `DomainsSignedBoundsDomain.v` — DOM-9
 
 - `signed_bounds_lattice`, `signed_bounds_wrank` — Definitions; lattice and widening rank.
-- `signed_bounds_domain`, `signed_bounds_numeric`, `signed_bounds_capped` — Definitions; domains.
-- `signed_bounds_laws`, `signed_bounds_word_laws`, `signed_bounds_numeric_laws` — Theorems.
+- `signed_bounds_domain`, `signed_bounds_classic_domain`, `signed_bounds_numeric`,
+  `signed_bounds_capped` — Definitions; domains.
+- `signed_bounds_laws`, `signed_bounds_word_laws`, `signed_bounds_classic_word_laws`,
+  `signed_bounds_numeric_laws` — Theorems.
 - `signed_bounds_capped_laws` — Theorem.
 - `signed_bounds_query` — Definition; reduced per-sign bit and bound query.
 - `signed_bounds_query_sound`, `signed_bounds_query_empty`, `signed_bounds_query_bounds_exact` — Theorems.

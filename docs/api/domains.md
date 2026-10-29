@@ -1307,6 +1307,7 @@ Definition signed_bounds_lattice (w : width) : lattice signed_bounds.
 Definition signed_bounds_wrank (w : width) :
   bounded_widening_rank (signed_bounds_lattice w).
 Definition signed_bounds_domain : word_domain signed_bounds.
+Definition signed_bounds_classic_domain : word_domain signed_bounds.
 Definition signed_bounds_numeric : numeric_domain (tagged signed_bounds) :=
   tagged_domain signed_bounds_domain.
 Definition signed_bounds_capped (maxw : width) :
@@ -1314,6 +1315,8 @@ Definition signed_bounds_capped (maxw : width) :
 
 Theorem signed_bounds_laws : forall w, lattice_laws (signed_bounds_lattice w).
 Theorem signed_bounds_word_laws : word_laws signed_bounds_domain signed_bounds_gamma.
+Theorem signed_bounds_classic_word_laws :
+  word_laws signed_bounds_classic_domain signed_bounds_gamma.
 Theorem signed_bounds_numeric_laws :
   numeric_laws signed_bounds_numeric (tagged_gamma signed_bounds_gamma).
 Theorem signed_bounds_capped_laws : forall maxw,
@@ -1332,12 +1335,21 @@ the bare weak lattice laws to infer leastness: prove any component hull or least
 `pconst` creates the wrapped singleton in its sign hemisphere.
 
 For forward transfer, split each input into at most two hemisphere branches, apply the landed
-`known_bits_domain` and `wrapped_domain` transfer to the corresponding masks and non-wrapping
-interval arcs, split each result into its output sign hemispheres, join all combinations, and
-reduce. A circular output arc can intersect a hemisphere in two pieces; take the enclosing
+`known_bits_precise_domain` and `wrapped_domain` transfers to the corresponding masks and
+non-wrapping interval arcs, split each result into its output sign hemispheres, join all
+combinations, and reduce. The precise known-bit dictionary uses `tnum_mul_precise` for a
+two-operand `bvmul` with both input widths equal to the result width, and otherwise delegates to
+`known_bits_domain`. Its backward transfer is the existing DOM-2 transfer. The classic domain
+uses `known_bits_domain` for forward transfer and otherwise has the same operations, reduction,
+representation and meaning. `signed_bounds_domain`, `signed_bounds_numeric` and
+`signed_bounds_capped` select the precise version; clients can use `tagged_domain` or
+`capped_domain` with `signed_bounds_classic_domain` for the classic version. Both word-law
+theorems hold for all raw inputs. Neither multiplier is required to dominate the other.
+
+A circular output arc can intersect a hemisphere in two pieces; take the enclosing
 interval hull of both pieces, rather than assuming their union is a single interval. There are
 at most 2^3 combinations for valid Bits arity. The choice of widening and
-the existing component transfers are a deliberate Gaulois adaptation; they do not promise the
+the selected component transfers are a deliberate Gaulois adaptation; they do not promise the
 paper's full tnum-plus operation precision. A result with a `WFull` arc splits to full intervals
 in both output signs. For a malformed shape, use a sound fallback satisfying all `word_laws`.
 For backward transfer, run each component `passume` on every input-branch combination and each
@@ -1348,6 +1360,16 @@ length/refinement even where evaluation is None.
 The definitions must respect the existing component total zero-division, rotation, shift and
 width-changing semantics. No non-emptiness assumption may be inferred from a merely consistent
 mask without checking its interval intersection.
+
+For numeric width `w`, DOM-8 multiplication returns bottom on contradictory masks; otherwise it
+performs `w` stages, each with at most one scalar shift, tnum addition and join. The classic DOM-2
+multiplication uses a constant number of big-integer operations, including its low-zero count.
+Both return exact results for two constants, but DOM-8 still executes its width-bounded loop.
+These are source-level operation counts, not bit complexity or benchmark results; operand sizes
+and the cost of big-integer operations matter. Forward lifting invokes a component transfer for
+at most eight branch combinations, with reduction and wrapped-transfer costs additional. Width is
+positive, so there is no width-zero case. Malformed arities or widths retain the existing sound
+fallback behavior; contradictory masks have empty concretisation.
 
 ### Pair-aware queries
 

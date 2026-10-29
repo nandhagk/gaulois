@@ -34,6 +34,8 @@ Conventions used in every signature below:
   make its type parameters implicit; they are omitted here.
 - A declaration that ends in `.` with no body is a signature; the lines after it list equations
   that the body satisfies by `reflexivity`. The card writes the body.
+- VIEW-2's indexed graph and generator observations are the explicit exception below: their
+  reference equations are proved pointwise, rather than required by definitional equality.
 - `sigma` is a function `N -> A` (or over another unknown type). An engine (`solve_total` or
   `solve_fuel`) returns `{s : X -> A | post_solution L S s}`, and
   `lookup EX L m` is such a function.
@@ -467,19 +469,24 @@ Definition skel_out {A G} (prog : stmt A G) (v : skel_point) :
                    for i < length ns, in order: label_point prog p (nth i ns n)
                      [AIndexIs g i; AJump p (nth i ns n)];
                    then label_point prog p n [AIndexAtLeast g (length ns); AJump p n]
-   For v = PExit q with q = p.d, by the statement at p and the direction d:
+   For v = PExit q with q = p.d and q a valid position, by the statement at p and direction d:
      Seq, d = DFirst   PEntry p.DSecond []      Seq, d = DSecond   PExit p []
      If                PExit p []               Block              PExit p []
      Loop              PEntry p.DBody []
-   and nothing for PExit nil. *)
+   and nothing for PExit nil or any invalid position. PEntry at an invalid position also has
+   no edges. *)
 Definition skel_nodes {A G} (prog : stmt A G) : list skel_point :=
   flat_map (fun p => [PEntry p; PExit p]) (positions prog).
-Definition skel_to {A G} (prog : stmt A G) (e : skel_edge A G) : skel_point :=
-  match nth_error (skel_out prog (from e)) (slot e) with Some (t, _) => t | None => from e end.
-Definition skel_acts {A G} (prog : stmt A G) (e : skel_edge A G) : list (action A G) :=
-  match nth_error (skel_out prog (from e)) (slot e) with Some (_, a) => a | None => nil end.
+Definition skel_to {A G} (prog : stmt A G) (e : skel_edge A G) : skel_point.
+Definition skel_acts {A G} (prog : stmt A G) (e : skel_edge A G) : list (action A G).
+(* For every edge key, prove pointwise agreement with these reference equations:
+   skel_to prog e = match nth_error (skel_out prog (from e)) (slot e) with
+                    | Some (t, _) => t | None => from e end;
+   skel_acts prog e = match nth_error (skel_out prog (from e)) (slot e) with
+                      | Some (_, a) => a | None => nil end. *)
 Definition skeleton_graph {A G} (prog : stmt A G) : Graph.t skel_point (skel_edge A G).
-(* Graph.entries = [PEntry nil]; Graph.nodes = skel_nodes prog;
+(* Prove these observations pointwise, without requiring definitional equality:
+   Graph.entries = [PEntry nil]; Graph.nodes = skel_nodes prog;
    Graph.out v = map (fun i => SkelEdge v i) (seq 0 (length (skel_out prog v)));
    Graph.source = from; Graph.target = skel_to prog *)
 Definition skeleton_view {A G St O} (prog : stmt A G) (C : skeleton_client A G St O) :
@@ -501,7 +508,7 @@ Definition stops_at {A G St O} (prog : stmt A G) (C : skeleton_client A G St O)
     (p : position) (st : St) : Prop := stopped (skeleton_endings prog C) (Go p nil st).
 (* A store agreement lifted to machine states: only the store is compared. *)
 Definition store_agreement {Fa St} (Ra : agreement Fa St) : agreement Fa (mstate St) :=
-  Agreement (fun a m n => agree Ra a (store_of m) (store_of n)).
+  Agreement Fa (mstate St) (fun a m n => agree Ra a (store_of m) (store_of n)).
 
 (* Generators over program points: the dense generators on the skeleton graph. The client gives
    one transfer per action; an edge applies its actions in order (forward) or last-to-first
@@ -509,28 +516,38 @@ Definition store_agreement {Fa St} (Ra : agreement Fa St) : agreement Fa (mstate
 Definition skel_root (n : skel_point) : bool :=
   match n with PEntry nil => true | _ => false end.
 Definition edge_fwd {A G Fa} (prog : stmt A G) (act : action A G -> Fa -> Fa)
-    (e : skel_edge A G) (f : Fa) : Fa :=
-  fold_left (fun f x => act x f) (skel_acts prog e) f.
+    (e : skel_edge A G) (f : Fa) : Fa.
 Definition edge_bwd {A G Fa} (prog : stmt A G) (actb : action A G -> Fa -> Fa)
-    (e : skel_edge A G) (f : Fa) : Fa :=
-  fold_right actb f (skel_acts prog e).
+    (e : skel_edge A G) (f : Fa) : Fa.
+(* Prove pointwise agreement with fold_left (fun f x => act x f) (skel_acts prog e) f
+   and fold_right actb f (skel_acts prog e), respectively. *)
 Definition skeleton_forward {A G Fa} (L : lattice Fa) (prog : stmt A G) (init : Fa)
     (act : action A G -> Fa -> Fa) :
-    System.t skel_point (dense_constraint skel_point (skel_edge A G)) Fa :=
-  forward_system (skeleton_graph prog) (fun n => if skel_root n then init else bot L)
-    (edge_fwd prog act).
+    System.t skel_point (dense_constraint skel_point (skel_edge A G)) Fa.
 Definition skeleton_forward_static {A G Fa} (L : lattice Fa) (prog : stmt A G) (init : Fa)
-    (act : action A G -> Fa -> Fa) : System.static (skeleton_forward L prog init act) :=
-  forward_static (skeleton_graph prog) (fun n => if skel_root n then init else bot L)
-    (edge_fwd prog act).
+    (act : action A G -> Fa -> Fa) : System.static (skeleton_forward L prog init act).
 Definition skeleton_backward {A G Fa} (prog : stmt A G) (exitf : skel_point -> Fa)
     (actb : action A G -> Fa -> Fa) :
-    System.t skel_point (dense_constraint skel_point (skel_edge A G)) Fa :=
-  backward_system (skeleton_graph prog) exitf (edge_bwd prog actb).
+    System.t skel_point (dense_constraint skel_point (skel_edge A G)) Fa.
 Definition skeleton_backward_static {A G Fa} (prog : stmt A G) (exitf : skel_point -> Fa)
-    (actb : action A G -> Fa -> Fa) : System.static (skeleton_backward prog exitf actb) :=
-  backward_static (skeleton_graph prog) exitf (edge_bwd prog actb).
+    (actb : action A G -> Fa -> Fa) : System.static (skeleton_backward prog exitf actb).
 ```
+
+The reference systems are `forward_system (skeleton_graph prog)` with root seed
+`fun n => if skel_root n then init else bot L` and `edge_fwd prog act`, and
+`backward_system (skeleton_graph prog) exitf (edge_bwd prog actb)`, with their corresponding
+`forward_static` and `backward_static` records. Prove agreement of constraint lists and, for
+every constraint and assignment, targets, query evaluation, reads and sides; prove static
+dependencies and side targets agree pointwise. These observations cover arbitrary `Seed n` and
+`Flow e`, including keys absent from the constraint list. Do not assume functional extensionality.
+
+Prepare each node's outgoing list once, retaining outgoing edge keys by point and resolved
+target/action payloads by encoded edge key in canonical maps. Capture the prepared maps in graph
+and system callbacks; row processing must not reconstruct `skel_out`, scan an edge list, or
+rebuild an index. Agreement covers all keys, including invalid positions and out-of-range slots,
+and preserves edge order, duplicate destinations, omitted invalid labels and default actions.
+Each syntactic occurrence is indexed by its position, even when two subtrees are structurally
+equal. Preserve all post-solution quantifiers and the semantic theorem premises.
 
 ### VIEW-3: region summaries
 
@@ -1281,7 +1298,8 @@ Theorem skeleton_forward_sound {A G St O Fa} (L : lattice Fa) (Gc : concretisati
   forall m, reachable_state (skeleton_semantics prog C) m ->
     gamma Gc (sigma (point (skeleton_view prog C) m)) (store_of m).
 ```
-Proof idea: `forward_invariant_sound` on the skeleton view with `G := fun _ => Gc`, with one `act`
+Proof idea: `forward_invariant_sound` on the skeleton view with `Gc` pulled back along `store_of`,
+with one `act`
 premise per edge by folding `act_hold` over `skel_acts prog e`. Card: VIEW-2.
 
 ```coq
@@ -1637,8 +1655,8 @@ interval witness from `ptr_reach_sound` and shifts its bounds by the offset and 
 - Keys are small. A `skel_edge` is a point and a slot, a point is a position of at most `skel_depth`
   directions, and a balanced `seq_of_list` keeps a block of `n` statements at depth `log2 n`, so an
   encoding costs a few bit operations per direction and never grows with the length of a block.
-  `skel_out prog v` is computed once per node, at the cost of the `sub` and `label_point` lookups,
-  and `Graph.out v` is built by `seq`; no edge list is scanned inside a loop.
+  `skel_out prog v` is computed once per node, at the cost of the `sub` and `label_point` lookups;
+  retained canonical maps provide outgoing keys and edge payloads without scans inside loops.
 - `dom_context` is built once per graph. `check_idom` runs one blocked search per reachable node,
   O(V (V + E)); `dominating_edges_in` is one walk of the tree chain, O(depth of the block);
   `refined_fact` costs that walk plus one refinement per guard of each edge, and creates no node.
