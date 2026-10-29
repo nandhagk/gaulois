@@ -5,15 +5,20 @@
     Builds on: ExamplesSsaViews, AnalysesLiveness and DomainsConst. *)
 
 From Stdlib Require Import List Bool ZArith.
-From Gaulois.Collections Require Import CollectionsEncoding.
-From Gaulois.Order Require Import OrderBasic OrderConcrete OrderFlat OrderPointwise.
+From Gaulois.Collections Require Import CollectionsEncoding CollectionsFinSet.
+From Gaulois.Order Require Import OrderLattice OrderBasic OrderConcrete OrderFlat OrderPointwise
+  OrderLift.
 From Gaulois.Bits Require Import BitsWord.
 From Gaulois.Domains Require Import DomainsNumeric DomainsConst.
-From Gaulois.Analyses Require Import AnalysesLiveness AnalysesDemand AnalysesEgraph.
-From Gaulois.Views Require Import ViewsSemantics ViewsGraph ViewsAgreement.
+From Gaulois.Graph Require Import GraphCore.
+From Gaulois.Fixpoint Require Import FixpointQuery FixpointSystem.
+From Gaulois.Analyses Require Import AnalysesLiveness AnalysesDemand AnalysesEgraph
+  AnalysesValues AnalysesPaths.
+From Gaulois.Views Require Import ViewsSemantics ViewsGraph ViewsAgreement ViewsSsa ViewsDominated.
 From Gaulois.Examples.While Require Import ExamplesWhileSemantics.
 From Gaulois.Examples.Ssa Require Import ExamplesSsaSyntax ExamplesSsaTyping
-  ExamplesSsaSemantics ExamplesSsaTypingProofs ExamplesSsaActivation ExamplesSsaViews.
+  ExamplesSsaSemantics ExamplesSsaTypingProofs ExamplesSsaActivation ExamplesSsaViews
+  ExamplesSsaBridge ExamplesSsaStrict.
 Import List.ListNotations.
 Local Open Scope nat_scope.
 
@@ -237,4 +242,131 @@ Proof.
   assert (Hword : word_ok W32 z = true) by (apply word_ok_valid; exact Hrange).
   cbn [op_eval]; rewrite Hword; cbn [bin_eval].
   rewrite Z.mul_1_r; unfold word_wrap; rewrite Z.mod_small by exact Hrange; reflexivity.
+Qed.
+
+(** * Numeric and dominated-guard clients *)
+
+Local Definition ssa_numeric_problem ext P f :=
+  numeric_problem const_numeric const_conc ssa_bridge TAny (ssa_block_view ext P f)
+    (values_of P f) (fun _ => TAny).
+
+Local Lemma ssa_numeric_laws ext :
+  sparse_domain_laws (sparse_of_numeric const_numeric const_conc ssa_bridge TAny)
+    ssa_truth (op_eval ext).
+Proof.
+  apply sparse_of_numeric_laws.
+  - apply tagged_numeric_laws, const_word_laws.
+  - apply ssa_bridge_laws.
+  - intros w z Hword. exact I.
+  - reflexivity.
+Qed.
+
+Local Lemma ssa_numeric_coverage ext P f s x c :
+  wf_program ext P -> reachable_state (activation ext P f) s ->
+  val (ssa_block_view ext P f) s x = Some c -> In x (values_of P f).
+Proof.
+  intros Hwf Hreachable Hval.
+  pose proof (proj1 (activation_reachable_good ext P f s Hwf Hreachable) x c Hval) as Htyped.
+  exact (ExamplesSsaViews.ssa_static_value P f x (ty_of c) (proj1 Htyped)).
+Qed.
+
+Local Lemma ssa_numeric_initial_origin ext P f s x c :
+  wf_program ext P -> initial (activation ext P f) s ->
+  val (ssa_block_view ext P f) s x = Some c ->
+  def (ssa_block_view ext P f) x = Arbitrary \/
+    exists b i, def (ssa_block_view ext P f) x = Param b i /\
+      In b (Graph.entries (cfg (base (ssa_block_view ext P f)))).
+Proof.
+  intros Hwf [fd [b [cs [env [Hf [Hb [Htypes [Hvalid [Hbind ->]]]]]]]]] Hval.
+  change (env x = Some c) in Hval.
+  assert (Hin : In x (map fst (bparams b))).
+  { destruct (in_dec Nat.eq_dec x (map fst (bparams b))) as [Hin|Houtside]; [exact Hin|].
+    rewrite (ssa_bind_frame _ _ _ _ _ Hbind Houtside) in Hval. discriminate. }
+  apply in_map_iff in Hin. destruct Hin as [[y ty] [Hxy Hin]]. cbn in Hxy; subst y.
+  apply In_nth_error in Hin. destruct Hin as [i Hnth].
+  pose proof (ExamplesSsaViews.ssa_parameter_definition_at ext P f fd (fentry fd) b i x ty
+    Hwf Hf Hb Hnth) as Hdef.
+  destruct (FinSet.mem nat_encoding (fentry fd) (ExamplesSsaViews.ssa_call_targets P f)).
+  - left. exact Hdef.
+  - right. exists (fentry fd), i. split; [exact Hdef|].
+    change (In (fentry fd) (ssa_entries P f)). unfold ssa_entries; rewrite Hf.
+    left; reflexivity.
+Qed.
+
+Local Lemma ssa_numeric_initial ext P f sigma :
+  wf_program ext P -> In f (map fst (funcs P)) ->
+  post_solution (lift_bot_lattice (lat const_numeric))
+    (sparse_system label_encoding var_encoding (ssa_numeric_problem ext P f)) sigma ->
+  forall s, initial (activation ext P f) s ->
+    sparse_invariant (ssa_numeric_problem ext P f) sigma s.
+Proof.
+  intros Hwf Hfunction Hpost s Hinitial. split.
+  - exact (sparse_entry_block label_encoding var_encoding (activation ext P f)
+      (ssa_numeric_problem ext P f) sigma (ssa_block_view_laws ext P f Hwf Hfunction)
+      Hpost s Hinitial).
+  - intros x c Hval.
+    assert (Hreachable : reachable_state (activation ext P f) s).
+    { exists s, []; split; [exact Hinitial|constructor]. }
+    pose proof (ssa_numeric_coverage ext P f s x c Hwf Hreachable Hval) as Hx.
+    destruct (ssa_numeric_initial_origin ext P f s x c Hwf Hinitial Hval)
+      as [Harbitrary|[b [i [Hdef Hentry]]]].
+    + exact (sparse_arbitrary_value label_encoding var_encoding (ssa_numeric_problem ext P f)
+        sigma (ssa_numeric_laws ext) Hpost x c Hx Harbitrary).
+    + assert (Hr : In (CEntryFact x) (SsaSystem.rows label_encoding
+        (ssa_numeric_problem ext P f))).
+      { apply (SsaSystem.value_row label_encoding (ssa_numeric_problem ext P f) x);
+          [exact Hx|].
+        unfold SsaSystem.value_rows. cbn [ssa_numeric_problem numeric_problem view].
+        rewrite Hdef, (proj2 (FinSet.of_list_spec label_encoding b _) Hentry).
+        left; reflexivity. }
+      eapply (sparse_gamma_upper _ _ _ (Some TAny) _ c (ssa_numeric_laws ext)).
+      * exact (sparse_row_bound label_encoding var_encoding (ssa_numeric_problem ext P f)
+          sigma Hpost (CEntryFact x) Hr).
+      * exact (top_sound (ssa_numeric_laws ext) c).
+Qed.
+
+(** The constant sparse analysis contains every reachable SSA activation binding. *)
+Theorem ssa_sccp_sound (ext : nat -> list cval -> option cval) (P : program) (f : func)
+    (sigma : sparse_unknown label ssa_edge vid -> lift_bot (tagged (flat Z))) :
+  wf_program ext P -> In f (map fst (funcs P)) ->
+  post_solution (lift_bot_lattice (lat const_numeric))
+    (sparse_system label_encoding var_encoding
+       (numeric_problem const_numeric const_conc ssa_bridge TAny
+         (ssa_block_view ext P f) (values_of P f) (fun _ => TAny))) sigma ->
+  forall s x c, reachable_state (activation ext P f) s ->
+    val (ssa_block_view ext P f) s x = Some c ->
+    gamma (lift_bot_gamma (fact_conc (sparse_of_numeric const_numeric const_conc ssa_bridge TAny)))
+      (sigma (UVal x)) c.
+Proof.
+  intros Hwf Hfunction Hpost s x c [s0 [tr [Hstart Hrun]]].
+  assert (Hreachable : reachable_state (activation ext P f) s0).
+  { exists s0, []; split; [exact Hstart|constructor]. }
+  pose proof (ssa_numeric_initial ext P f sigma Hwf Hfunction Hpost s0 Hstart) as Hinv.
+  assert (Hfinal : sparse_invariant (ssa_numeric_problem ext P f) sigma s).
+  { clear Hstart. revert Hreachable Hinv.
+    induction Hrun as [a|a events a' rest t Hstep Hrun IH]; intros Hreachable Hinv.
+    - exact Hinv.
+    - apply IH.
+      + eapply reachable_state_step; eassumption.
+      + eapply (sparse_invariant_step label_encoding var_encoding (activation ext P f)
+          (ssa_numeric_problem ext P f) sigma
+          (ssa_block_view_laws ext P f Hwf Hfunction) (ssa_numeric_laws ext));
+          [intros a0 y d; apply ssa_numeric_coverage; exact Hwf|exact Hpost|
+            exact Hreachable|exact Hstep|exact Hinv]. }
+  exact (proj2 Hfinal x c).
+Qed.
+
+(** Every dominating SSA branch condition remains true at the current reachable block. *)
+Theorem ssa_guard_chain_sound (ext : nat -> list cval -> option cval) (P : program)
+    (f : func) (s : astate) :
+  wf_program ext P -> In f (map fst (funcs P)) ->
+  reachable_state (activation ext P f) s ->
+  Forall (cond_holds (ssa_block_view ext P f) s)
+    (guard_chain (ssa_block_view ext P f) label_encoding
+      (point (base (ssa_block_view ext P f)) s)).
+Proof.
+  intros Hwf Hfunction Hreachable.
+  exact (guard_chain_holds (activation ext P f) (ssa_block_view ext P f) label_encoding
+    (ssa_block_view_laws ext P f Hwf Hfunction) (ssa_strict_laws ext P f Hwf Hfunction)
+    s Hreachable).
 Qed.
