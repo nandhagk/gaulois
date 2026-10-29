@@ -989,9 +989,12 @@ Definition pts_set {V T} (ET : encoding T) (ops : list (ptr_op V T)) : Type :=
 Definition pts_lattice {V T} (ET : encoding T) (ops : list (ptr_op V T)) :
     lattice (pts_set ET ops) := finite_powerset_lattice ET (site_universe ET ops).
 Definition andersen_system {V T} (EV : encoding V) (ET : encoding T) (ops : list (ptr_op V T)) :
-  System.t (pts_key V T) nat (pts_set ET ops).
-(* One constraint per instruction, indexed by its position in ops (constraints = seq 0 (length ops)),
-   over pts_lattice ET ops, with U = site_universe ET ops:
+  System.t (pts_key V T) {i : nat | i < length ops} (pts_set ET ops).
+(* One constraint per instruction, indexed by its bounded position in ops. The constraints list
+   enumerates every position exactly once in increasing order, including distinct occurrences of
+   duplicate instructions. Its projection to nat is seq 0 (length ops); it is empty when ops is
+   empty. The target and rhs use the instruction at that position. The system is over
+   pts_lattice ET ops, with U = site_universe ET ops:
    PAlloc x t  : target PVal x, rhs Query.Ret {t}
    PCopy x y   : target PVal x, rhs Query.Ask (PVal y) (fun a => Query.Ret a)
    PLoad x p   : target PVal x, rhs Query.Ask (PVal p) (fun a => ask_all (map PHeap (elements a))
