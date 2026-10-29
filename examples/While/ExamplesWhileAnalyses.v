@@ -11,8 +11,9 @@ From Gaulois.Graph Require Import GraphCore.
 From Gaulois.Fixpoint Require Import FixpointSystem FixpointTotal FixpointSchedule FixpointWorklist.
 From Gaulois.Domains Require Import DomainsEquality.
 From Gaulois.Views Require Import ViewsSemantics ViewsGraph ViewsSkeleton ViewsStructured
-  ViewsForward.
-From Gaulois.Analyses Require Import AnalysesLiveness AnalysesAvailable AnalysesDemand.
+  ViewsForward ViewsRegion.
+From Gaulois.Analyses Require Import AnalysesLiveness AnalysesAvailable AnalysesDemand
+  AnalysesStructured AnalysesCensus.
 From Gaulois.Examples.While Require Import ExamplesWhileSyntax ExamplesWhileSemantics
   ExamplesWhileSkeleton ExamplesWhileViews.
 Import List.ListNotations.
@@ -307,5 +308,63 @@ Theorem while_busy_sound (prog : stmt)
 Proof.
   intro Hpost; exact (busy_sound _ _ expr_encoding (while_genkill_view prog word_stores)
     sigma (while_genkill_laws prog word_stores) Hpost).
+Qed.
+
+(** Agreement on the structured live inputs preserves every source While behaviour. *)
+Theorem while_structured_liveness_sound (prog : stmt)
+    (sigma : skel_point -> skel_set var_encoding while_skel_vars (to_skeleton prog))
+    (c0 c1 : config) :
+  post_solution (skel_lattice var_encoding while_skel_vars (to_skeleton prog))
+    (structured_liveness_system var_encoding while_skel_vars (to_skeleton prog)) sigma ->
+  initial (while_semantics prog word_stores) c0 -> initial (while_semantics prog word_stores) c1 ->
+  (forall x, fmem var_encoding x (sigma (PEntry nil)) = true ->
+    store_of_config c0 x = store_of_config c1 x) ->
+  same_behaviour (while_semantics prog word_stores) while_endings c0
+    (while_semantics prog word_stores) while_endings c1.
+Proof.
+  intros Hpost [st0 [Hinit0 ->]] [st1 [Hinit1 ->]] Hagree.
+  eapply while_behaviour_transport with (m0 := Go [] [] st0) (m1 := Go [] [] st1).
+  - apply match_run, wc_root.
+  - apply match_run, wc_root.
+  - eapply (structured_liveness_sound var_encoding (while_client word_stores)
+      while_skel_vars (fun st x => st x) (to_skeleton prog) sigma).
+    + apply while_client_laws.
+    + apply while_skel_vars_laws.
+    + exact Hpost.
+    + exists st0; split; [reflexivity|exact Hinit0].
+    + exists st1; split; [reflexivity|exact Hinit1].
+    + exact Hagree.
+Qed.
+
+(** A checked While certificate extends to a post-solution with its exact head facts. *)
+Theorem while_certificate_sound (prog : stmt)
+    (cert : certificate var_encoding while_skel_vars (to_skeleton prog)) :
+  certificate_check var_encoding while_skel_vars (to_skeleton prog) cert = true ->
+  exists sigma,
+    post_solution (skel_lattice var_encoding while_skel_vars (to_skeleton prog))
+      (structured_liveness_system var_encoding while_skel_vars (to_skeleton prog)) sigma /\
+    certificate_of var_encoding while_skel_vars (to_skeleton prog) sigma = cert.
+Proof.
+  apply certificate_sound.
+Qed.
+
+(** Every structured While post-solution yields an accepted loop certificate. *)
+Theorem while_certificate_complete (prog : stmt)
+    (sigma : skel_point -> skel_set var_encoding while_skel_vars (to_skeleton prog)) :
+  post_solution (skel_lattice var_encoding while_skel_vars (to_skeleton prog))
+    (structured_liveness_system var_encoding while_skel_vars (to_skeleton prog)) sigma ->
+  certificate_check var_encoding while_skel_vars (to_skeleton prog)
+    (certificate_of var_encoding while_skel_vars (to_skeleton prog) sigma) = true.
+Proof.
+  apply certificate_complete.
+Qed.
+
+(** While region tables agree with any client summary algebra at every position. *)
+Theorem while_region_table_agrees {R} (alg : summary_algebra atom expr R) (prog : stmt)
+    (p : position) :
+  Map.get position_encoding p (region_table alg (to_skeleton prog)) =
+  match sub (to_skeleton prog) p with Some s => Some (summarise alg s) | None => None end.
+Proof.
+  apply region_table_agrees.
 Qed.
 
