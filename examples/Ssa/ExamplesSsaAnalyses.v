@@ -4,16 +4,16 @@
     For example, factorial's auxiliary counter is live but has no observable demand.
     Builds on: ExamplesSsaViews, AnalysesLiveness and DomainsConst. *)
 
-From Stdlib Require Import List ZArith.
+From Stdlib Require Import List Bool ZArith.
 From Gaulois.Collections Require Import CollectionsEncoding.
 From Gaulois.Order Require Import OrderBasic OrderConcrete OrderFlat OrderPointwise.
 From Gaulois.Bits Require Import BitsWord.
 From Gaulois.Domains Require Import DomainsNumeric DomainsConst.
-From Gaulois.Analyses Require Import AnalysesLiveness AnalysesDemand.
+From Gaulois.Analyses Require Import AnalysesLiveness AnalysesDemand AnalysesEgraph.
 From Gaulois.Views Require Import ViewsSemantics ViewsGraph ViewsAgreement.
 From Gaulois.Examples.While Require Import ExamplesWhileSemantics.
 From Gaulois.Examples.Ssa Require Import ExamplesSsaSyntax ExamplesSsaTyping
-  ExamplesSsaActivation ExamplesSsaViews.
+  ExamplesSsaSemantics ExamplesSsaTypingProofs ExamplesSsaActivation ExamplesSsaViews.
 Import List.ListNotations.
 Local Open Scope nat_scope.
 
@@ -149,3 +149,92 @@ Definition p_value : vid := 3.
 
 (** Raw loop liveness is queried before the first loop instruction. *)
 Definition loop_header_point : label * nat := (1, 0).
+
+(** * Checked multiplication-by-one rewriting *)
+
+(** Every variable in this environment holds a canonical unsigned 32-bit integer. *)
+Definition ok_i32 (env : nat -> option cval) : Prop :=
+  forall i, exists z, env i = Some (VInt W32 z) /\ (0 <= z < 4294967296)%Z.
+
+Local Definition ssa_i32_operator (o : sop) : bool :=
+  match o with
+  | OConst (VInt W32 _) => true
+  | OBin W32 _ => true
+  | _ => false
+  end.
+
+Local Fixpoint ssa_i32_term (t : term sop) : bool :=
+  match t with
+  | TVar _ => true
+  | TApp o args => ssa_i32_operator o && forallb ssa_i32_term args
+  end.
+
+Local Lemma ssa_i32_operation_result ext o cs v :
+  ssa_i32_operator o = true -> op_eval ext o cs = Some v ->
+  exists z, v = VInt W32 z /\ (0 <= z < 4294967296)%Z.
+Proof.
+  destruct o as [c|w operation| | | |tag]; cbn [ssa_i32_operator]; try discriminate.
+  - destruct c as [[|] z|b off|f|z|z]; try discriminate.
+    intros Hoperator Heval; destruct cs; cbn [op_eval] in Heval; [|discriminate].
+    injection Heval as <-; exists (word_wrap W32 z); split; [reflexivity|].
+    exact (word_wrap_valid W32 z).
+  - destruct w; [|discriminate]; intros Hoperator Heval.
+    destruct cs as [|first rest]; [discriminate|].
+    destruct first as [wa a|block offset|f|bits|bits]; try discriminate.
+    destruct rest as [|second rest]; [discriminate|].
+    destruct second as [wb b|block offset|f|bits|bits]; try discriminate.
+    destruct rest as [|extra rest]; [|discriminate].
+    cbn [op_eval] in Heval.
+    destruct (iw_eq_dec W32 wa) as [Hwa|Hwa]; [subst wa|discriminate].
+    destruct (iw_eq_dec W32 wb) as [Hwb|Hwb]; [subst wb|discriminate].
+    destruct (word_ok W32 a && word_ok W32 b); [|discriminate].
+    pose proof (bin_eval_type W32 operation a b v Heval) as Htype.
+    pose proof (bin_eval_valid W32 operation a b v Heval) as Hvalid.
+    destruct operation; cbn [bin_result] in Htype;
+      destruct v as [[|] z|block offset|f|bits|bits]; try discriminate.
+    all: exists z; split; [reflexivity|exact Hvalid].
+Qed.
+
+Local Lemma ssa_i32_term_result ext env t v :
+  ok_i32 env -> ssa_i32_term t = true -> denote (op_eval ext) env t = Some v ->
+  exists z, v = VInt W32 z /\ (0 <= z < 4294967296)%Z.
+Proof.
+  intros Henv Hterm Heval; destruct t as [i|o args].
+  - destruct (Henv i) as [z [Hget Hrange]].
+    change (env i = Some v) in Heval; rewrite Hget in Heval; injection Heval as <-; eauto.
+  - apply andb_true_iff in Hterm; destruct Hterm as [Hoperator Hchildren].
+    rewrite denote_app in Heval.
+    destruct (denote_args (op_eval ext) env args); [|discriminate].
+    eapply ssa_i32_operation_result; [exact Hoperator|exact Heval].
+Qed.
+
+(** The demonstration term is the rule's multiplication-by-one left pattern. *)
+Definition mul_one_term : term sop :=
+  TApp (OBin W32 BMul) [TVar 0; TApp (OConst (VInt W32 1)) []].
+
+(** The guard admits precisely terms built from variables, 32-bit constants and arithmetic. *)
+Definition mul_one_rules : list (rewrite_rule sop) :=
+  [RewriteRule mul_one_term (TVar 0) (fun sub => ssa_i32_term (sub 0))].
+
+(** Every operator occurrence contributes one unit to the materialized tree objective. *)
+Definition unit_cost : sop -> nat := fun _ => 1.
+
+(** The guarded multiplication rule preserves the full result, including undefined evaluation. *)
+Theorem mul_one_rules_sound (ext : nat -> list cval -> option cval) :
+  Forall (rule_sound (op_eval ext) ok_i32) mul_one_rules.
+Proof.
+  constructor; [|constructor]; intros sub Hguard env Henv.
+  change (denote (op_eval ext) env
+    (TApp (OBin W32 BMul) [sub 0; TApp (OConst (VInt W32 1)) []]) =
+    denote (op_eval ext) env (sub 0)).
+  rewrite denote_binary.
+  change (match denote (op_eval ext) env (sub 0) with
+    | Some v => op_eval ext (OBin W32 BMul) [v; VInt W32 1]
+    | None => None
+    end = denote (op_eval ext) env (sub 0)).
+  destruct (denote (op_eval ext) env (sub 0)) as [v|] eqn:Heval; [|reflexivity].
+  destruct (ssa_i32_term_result ext env (sub 0) v Henv Hguard Heval) as [z [-> Hrange]].
+  assert (Hword : word_ok W32 z = true) by (apply word_ok_valid; exact Hrange).
+  cbn [op_eval]; rewrite Hword; cbn [bin_eval].
+  rewrite Z.mul_1_r; unfold word_wrap; rewrite Z.mod_small by exact Hrange; reflexivity.
+Qed.
