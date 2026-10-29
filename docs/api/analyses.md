@@ -5164,8 +5164,8 @@ cases. Prove behavior correspondence by grouping actual target paths into comple
 For each completed target macro, match its particular edge, event list and boundary endpoint
 with a source step and preserve the cache invariant for that paired history. In the other
 direction, match each source step with an actual complete target macro. Account for every
-nondeterministic target path; do not select a source successor before the target path completes
-and then assume that every administrative continuation reaches an agreeing endpoint.
+nondeterministic target path, choosing its matching source successor for that completed path.
+An earlier choice does not establish agreement at every administrative continuation.
 
 Handle target prefixes ending inside a macro by extending their actual silent administrative
 path to a boundary using `pre_local_progress`; preserve the prefix trace. Prove both ending
