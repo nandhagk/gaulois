@@ -183,8 +183,21 @@ Definition while_var_view (prog : stmt) (init : store -> Prop) :
 (* gview = skeleton_view (to_skeleton prog) (while_client init); uses and defs of an edge from its
    actions (`skel_acts`) through while_skel_vars and act_vars; exit_uses _ = nil;
    vget m x = store_of m x *)
-Definition while_region_alg (prog : stmt) : summary_algebra atom expr bool.
-(* the algebra whose summarise is `falls`, with ok a = true for every atom *)
+Definition while_region_alg (prog : stmt) : summary_algebra atom expr (bool * list nat).
+(* For child summaries (b, e), the fields are:
+   on_atom _ = (true, nil);
+   on_seq (b1, e1) (b2, e2) = (b1 && b2, e1 ++ e2);
+   on_if _ (b1, e1) (b2, e2) = (b1 || b2, e1 ++ e2);
+   on_block (b, e) = (b || existsb (Nat.eqb 0) e, lower e);
+   on_loop (b, e) = (false, lower e);
+   on_jump n = (false, [n]); on_jump_if _ n = (true, [n]);
+   on_jump_table _ ns n = (false, n :: ns).
+   The program argument does not change the fields. The second component preserves the order and
+   duplicates of escapes, including the default before the table entries. *)
+(* Each child is summarised once in a bottom-up traversal. Charge list concatenation, lowering and
+   zero scans to the sizes of the materialised summaries and their child inventories, in addition
+   to traversal and map costs. The total inventory size can exceed the syntax size; do not traverse
+   source subtrees again per node or scan these lists inside solver loops. *)
 (* The effects of While's atoms: only an output observes; nothing reads or writes a heap, traps,
    stops, allocates, frees or calls. *)
 Definition while_effects : effects atom.
@@ -652,6 +665,9 @@ matched by the skeleton rule of the same name, with `jump_cont` matched by `resu
 Theorem while_client_laws (init : store -> Prop) : skeleton_client_laws (while_client init).
 Theorem while_skel_vars_laws (init : store -> Prop) :
   skel_vars_laws (while_client init) while_skel_vars (fun sigma x => sigma x).
+(** The fold gives completion and the ordered escape inventory for every skeleton. *)
+Theorem while_region_alg_agrees (prog : stmt) (s : Skeleton.stmt atom expr) :
+  summarise (while_region_alg prog) s = (falls (fun _ => true) s, escapes s).
 (** A While program whose breaks and continues name existing loops has well-nested labels. *)
 Theorem to_skeleton_labels_ok (s : stmt) :
   loops_ok 0 s = true -> labels_ok 0 (to_skeleton s) = true.

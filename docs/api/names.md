@@ -938,6 +938,8 @@ Contract: [Examples](examples.md).
 
 - `while_skel_vars`, `while_var_view`, `while_region_alg` — Definitions; variable and region
   adapters.
+- `while_region_alg_agrees` — Theorem; the region summary agrees with completion and escaping
+  labels for every skeleton.
 - `while_effects`, `while_effects_view`, `while_demand_view`, `while_genkill_view`,
   `while_copy_view` —
   Definitions; While effects, demand, expression and copy adapters.
