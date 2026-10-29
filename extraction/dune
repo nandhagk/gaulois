@@ -1,0 +1,22 @@
+(rocq.extraction
+ (prelude ExtractGaulois)
+ (extracted_files
+  algorithms.ml
+  algorithms.mli
+  rules_solver.ml
+  rules_solver.mli)
+ (theories
+  Stdlib
+  Gaulois.Collections
+  Gaulois.Order
+  Gaulois.Graph
+  Gaulois.Fixpoint
+  Gaulois.Rules))
+
+(rule
+ (alias check)
+ (deps
+  (:artifacts algorithms.ml algorithms.mli rules_solver.ml rules_solver.mli)
+  extracted/gaulois_extracted.cmxa)
+ (action
+  (run %{exe:../tools/gaulois.exe} check extraction %{artifacts})))

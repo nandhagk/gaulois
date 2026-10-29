@@ -1,7 +1,13 @@
 (library
  (name gaulois_check)
- (modules check)
- (libraries core core_unix core_unix.command_unix core_unix.filename_unix)
+ (modules check bench)
+ (libraries
+  core
+  core_kernel.nonempty_list
+  core_unix
+  core_unix.command_unix
+  core_unix.filename_unix
+  gaulois_extracted)
  (preprocess
   (pps ppx_jane))
  ; The generated inline-test entry point has no interface, triggering warning 70.

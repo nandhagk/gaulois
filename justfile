@@ -17,9 +17,13 @@ build *targets:
 test *args:
     {{ capped }} dune build -j 2 @tests/default @examples/default @runtest "$@"
 
-# Check formatting, source hygiene, layout and kernel-reported theorem assumptions.
+# Check formatting, source hygiene, layout, theorem assumptions and typed extraction.
 check *args:
-    {{ capped }} bash -c 'dune build -j 2 @fmt @theories/default @examples/default @tests/default tools/gaulois.exe "$@" && exec _build/default/tools/gaulois.exe check' -- "$@"
+    {{ capped }} bash -c 'dune build -j 2 @fmt @theories/default @examples/default @tests/default @extraction/check tools/gaulois.exe "$@" && exec dune exec --no-build tools/gaulois.exe -- check' -- "$@"
+
+# Run reproducible generated workloads and report experimental sizes and timings.
+bench *args:
+    {{ capped }} dune exec -j 2 tools/gaulois.exe -- bench "$@"
 
 # Format every source file in place.
 fmt:

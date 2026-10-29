@@ -1,0 +1,17 @@
+(copy_files ../algorithms.ml)
+
+(copy_files ../algorithms.mli)
+
+(copy_files ../rules_solver.ml)
+
+(copy_files ../rules_solver.mli)
+
+(library
+ (name gaulois_extracted)
+ (modules algorithms rules_solver)
+ ; Rocq emits catch-all matches (warning 4), such as matching XH before a wildcard.
+ ; Standard nat realizations emit `let rec add = (+)` (warning 39).
+ ; Extracted records reuse labels, such as `pending` in Tarjan and queue states (warning 41).
+ ; Other repository warnings remain enabled and fatal, including unsafe target typing failures.
+ (flags
+  (:standard -w -4-39-41)))

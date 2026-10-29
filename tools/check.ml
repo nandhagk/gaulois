@@ -1161,6 +1161,73 @@ let check_command audits =
      fun () -> run ~repository audits)
 ;;
 
+module Extraction = struct
+  let artifacts = [ "algorithms.ml"; "algorithms.mli"; "rules_solver.ml"; "rules_solver.mli" ]
+  let solver_implementation = "rules_solver.ml"
+  let solver_interface = "rules_solver.mli"
+  let compact source = String.filter source ~f:(fun c -> not (Char.is_whitespace c))
+
+  let forbidden ~file source spelling =
+    if String.is_substring (compact source) ~substring:spelling
+    then
+      Or_error.error_s
+        [%message "forbidden extraction dependency" (file : Filename.t) (spelling : string)]
+    else Ok ()
+  ;;
+
+  let required ~file source spelling =
+    if String.is_substring (compact source) ~substring:spelling
+    then Ok ()
+    else
+      Or_error.error_s
+        [%message "missing extraction declaration" (file : Filename.t) (spelling : string)]
+  ;;
+
+  (* Each monolithic extraction includes its complete transitive dependency closure. Checking
+     the whole solver output also catches universe enumeration hidden behind helper calls. *)
+  let inspect ~file source =
+    let%bind.Or_error () = forbidden ~file source "Obj.magic" in
+    let basename = Filename.basename file in
+    if String.equal basename solver_implementation || String.equal basename solver_interface
+    then (
+      let%bind.Or_error () =
+        List.map [ "herbrand"; "tuple_words" ] ~f:(forbidden ~file (String.lowercase source))
+        |> Or_error.combine_errors_unit
+      in
+      if String.equal basename solver_interface
+      then (
+        let%bind.Or_error () =
+          required ~file source "valfinite_powerset_lattice:'a1encoding->'a1finite_setlattice"
+        in
+        required ~file source "valsolve_program:'a1program->'a1ground_atomlist->'a1databaseoption")
+      else required ~file source "letsolve_programprogfacts=")
+    else if String.is_empty (String.strip source)
+    then Or_error.error_s [%message "empty extraction artifact" (file : Filename.t)]
+    else Ok ()
+  ;;
+
+  let run files =
+    let actual = List.map files ~f:Filename.basename |> List.sort ~compare:String.compare in
+    let expected = List.sort artifacts ~compare:String.compare in
+    if not ([%equal: string list] actual expected)
+    then
+      Or_error.error_s
+        [%message "incomplete extraction inventory" (actual : string list) (expected : string list)]
+    else
+      List.map files ~f:(fun file ->
+        let%bind.Or_error source = Or_error.try_with (fun () -> In_channel.read_all file) in
+        inspect ~file source)
+      |> Or_error.combine_errors_unit
+  ;;
+
+  let command =
+    Command.basic_or_error
+      ~summary:"Inspect all generated artifacts and the complete Rules solver closure"
+      (let%map_open.Command files = anon (sequence ("ARTIFACT" %: string)) in
+       fun () -> run files)
+  ;;
+end
+
 let command =
   Command.group
     ~summary:"Check source hygiene, layout and theorem assumptions"
@@ -1171,7 +1238,8 @@ let command =
       | Error error ->
         eprint_s [%sexp (error : Error.t)];
         exit 1)
-    (List.map Audit.all ~f:(fun audit -> Audit.to_string audit, check_command [ audit ]))
+    (List.map Audit.all ~f:(fun audit -> Audit.to_string audit, check_command [ audit ])
+     @ [ "extraction", Extraction.command ])
 ;;
 
 module Fixture = struct
@@ -2021,4 +2089,73 @@ Qed.|}
   in
   print_s [%sexp (result : unit Or_error.t)];
   [%expect {| (Ok ()) |}]
+;;
+
+let%expect_test "extraction rejects casts in any artifact including interfaces" =
+  List.iter Extraction.artifacts ~f:(fun file ->
+    print_s [%sexp (Extraction.inspect ~file "let unsafe = Obj . magic" : unit Or_error.t)]);
+  [%expect
+    {|
+    (Error
+     ("forbidden extraction dependency" (file algorithms.ml)
+      (spelling Obj.magic)))
+    (Error
+     ("forbidden extraction dependency" (file algorithms.mli)
+      (spelling Obj.magic)))
+    (Error
+     ("forbidden extraction dependency" (file rules_solver.ml)
+      (spelling Obj.magic)))
+    (Error
+     ("forbidden extraction dependency" (file rules_solver.mli)
+      (spelling Obj.magic)))
+    |}]
+;;
+
+let%expect_test "extraction inspects solver helpers and rejects universe enumeration" =
+  List.iter [ "herbrand"; "tuple_words" ] ~f:(fun helper ->
+    let source = [%string "let helper = %{helper}\nlet solve_program prog facts = helper"] in
+    print_s
+      [%sexp (Extraction.inspect ~file:Extraction.solver_implementation source : unit Or_error.t)]);
+  [%expect
+    {|
+    (Error
+     ("forbidden extraction dependency" (file rules_solver.ml)
+      (spelling herbrand)))
+    (Error
+     ("forbidden extraction dependency" (file rules_solver.ml)
+      (spelling tuple_words)))
+    |}]
+;;
+
+let%expect_test "extraction inventory and unreadable outputs fail closed" =
+  print_s [%sexp (Extraction.run [] : unit Or_error.t)];
+  let files = List.map Extraction.artifacts ~f:(Filename.concat "/dev/null") in
+  let result = Extraction.run files in
+  print_s [%message (Result.is_error result : bool)];
+  [%expect
+    {|
+    (Error
+     ("incomplete extraction inventory" (actual ())
+      (expected (algorithms.ml algorithms.mli rules_solver.ml rules_solver.mli))))
+    ("Result.is_error result" true)
+    |}]
+;;
+
+let%expect_test "finite universe erasure is checked in the generated solver signature" =
+  let signature =
+    "val finite_powerset_lattice : 'a1 encoding -> 'a1 finite_set lattice\n\
+     val solve_program : 'a1 program -> 'a1 ground_atom list -> 'a1 database option"
+  in
+  print_s [%sexp (Extraction.inspect ~file:Extraction.solver_interface signature : unit Or_error.t)];
+  let unerased =
+    String.substr_replace_all signature ~pattern:"encoding ->" ~with_:"encoding -> 'a1 list ->"
+  in
+  print_s [%sexp (Extraction.inspect ~file:Extraction.solver_interface unerased : unit Or_error.t)];
+  [%expect
+    {|
+    (Ok ())
+    (Error
+     ("missing extraction declaration" (file rules_solver.mli)
+      (spelling valfinite_powerset_lattice:'a1encoding->'a1finite_setlattice)))
+    |}]
 ;;
