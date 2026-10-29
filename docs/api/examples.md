@@ -475,18 +475,21 @@ Definition ssa_effects : effects instr_or_term.
    observes; TCall: calls, may_diverge, may_stop, may_trap; TRet: calls, observes; TJump, TBr and
    TSwitch: none. `reads` is true when the step, the trap or the stop may depend on the heap *)
 Definition ssa_var_view (ext : nat -> list cval -> option cval) (P : program) (f : func) :
-  var_view astate event (label * nat) ssa_edge vid cval.
+  var_view astate event (label * nat) ssa_edge vid (option cval).
 (* uses = the operands of the instruction or terminator edge (a branch edge: the condition and the
    arguments passed along it); defs = its result, or the parameters of the target for a jump, branch
    or switch edge and the one parameter of the continuation for a call; exit_uses at the node of an
-   instruction that may trap its operands, elsewhere nil; vget s x = aenv s x *)
+   instruction marked may_trap by ssa_effects are its operands, elsewhere nil; vget s x = aenv s x.
+   This includes the conservative operands of free, load and store, although activation does not
+   model their memory traps. At nodes outside the function's instruction points, exit_uses is nil. *)
 Definition ssa_demand_view (ext : nat -> list cval -> option cval) (P : program) (f : func) :
-  demand_view astate event (label * nat) ssa_edge vid cval bool.
+  demand_view astate event (label * nat) ssa_edge vid (option cval) bool.
 (* dgraph and ddefs as in ssa_var_view; dnec e: the operands of an effectful instruction (effectful
    ssa_effects KeepTraps), of a branch, a switch, a call and a return; dback e x true: for an edge
    that defines x by an IOp, the operands of the operation, and for a jump edge that defines the
-   parameter x, the argument passed for it; dback e x false = nil; dexit = nil; dlookup s x =
-   aenv s x; dvars = values_of P f *)
+   parameter x, the argument passed for it; dback e x false = nil;
+   dexit n = map (fun x => (x, true)) (exit_uses (ssa_var_view ext P f) n);
+   dlookup s x = aenv s x; dvars = values_of P f *)
 ```
 
 ### Ssa (EX-5b, EX-5c): effects, calls, lifting; (EX-6): memory
@@ -942,8 +945,13 @@ the well-formedness gives, the arguments are bound and unchanged since the compa
 `value_origin` by case analysis on the step: the binding is unchanged or comes from the rule that
 bound it, including parallel parameter bindings and arbitrary call results; `ssa_truth_nonzero`
 is `reflexivity` on the view.
-The demand laws follow the same case analysis as the variable view, with `trap_covered`-style
-reasoning for the trapping `IOp`s, which `ssa_effects` marks effectful under KeepTraps. Card: EX-5a.
+The demand laws follow the same case analysis as the variable view. Exit demands retain all raw
+exit operands, so Boolean demand agreement gives the equality required by `exits_determine`.
+Prove `demand_vars_ok` for every node, including unreachable blocks: well-formedness puts each
+listed operand in `values_of P f`. At reachable points, bound, valid, well-typed operands rule out
+the shape and range failures of other `IOp`s; division and extension traps are covered by their
+exit operands. Finality is determined by the point and activation never stops. Full-machine heap
+traps and resource stops are separate from activation endings. Card: EX-5a.
 
 ```coq
 (** Strictness: a value changes only where it is defined; guard subjects and operands are defined in

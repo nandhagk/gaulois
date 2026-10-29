@@ -510,8 +510,8 @@ Contract: [Float](float.md).
 - `fl_any_widening_rank` — Definition; bounded widening rank for the Ssa float lattice.
 - `float_ssa_domain` — Definition; sparse value domain for float extension operations.
 - `float_problem` — Definition; sparse float analysis problem for an Ssa function.
-- `nan_domain_ssa` — Definition; NaN demand and agreement lifted to Ssa values.
-- `ssa_nan_demand_view` — Definition; Ssa operand demands and backwards transfers.
+- `nan_domain_ssa` — Definition; NaN demand and agreement lifted to optional Ssa values.
+- `ssa_nan_demand_view` — Definition; Ssa operand and exit demands and backwards transfers.
 - `float_ext_respects` — Theorem; extension evaluation respects the declared signatures.
 - `float_ext_tag_decode` — Theorem; decoding a generated tag recovers its width and operation.
 - `float_ext_decode_tag` — Theorem; a decoded tag is the tag of its decoded operation.

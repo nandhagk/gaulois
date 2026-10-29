@@ -203,25 +203,30 @@ Definition float_problem (nm32 : @nan_model 24 128) (nm64 : @nan_model 53 1024)
   sparse_problem astate event label ssa_edge vid sop cval fl_any :=
   SparseProblem (ssa_block_view (float_ext nm32 nm64) P f) float_ssa_domain vals entry.
 
-Definition nan_domain_ssa : demand_domain nan_demand cval.
-(* dlat as in nan_domain; dagree d u v is True for NotDemanded; for a demand, nan_agree d of the
-   decoded floats when u and v are both VF32 in range or both VF64 in range, and u = v otherwise:
-   integers, pointers and functions agree exactly, and a float and a non-float never agree *)
+Definition nan_domain_ssa : demand_domain nan_demand (option cval).
+(* dlat as in nan_domain; dagree NotDemanded u v is True, including for None and Some. For a
+   demanded value, Some u and Some v agree by nan_agree on decoded floats when both are VF32 in
+   range or both VF64 in range, and by u = v otherwise; any case involving None agrees exactly
+   when the option values are equal. Integers, pointers and functions agree exactly, and a float
+   and a non-float never agree. Demanded true true agreement entails equality of the option values,
+   including out-of-range float bit patterns. *)
 Definition ssa_nan_demand_view (ext : nat -> list cval -> option cval) (P : program) (f : func) :
-  demand_view astate event (label * nat) ssa_edge vid cval nan_demand.
+  demand_view astate event (label * nat) ssa_edge vid (option cval) nan_demand.
 (* dgraph, ddefs and dlookup are those of ssa_demand_view ext P f.
    dnec e: every operand that ssa_demand_view marks needed at e (the operands of an output, a
    branch, a switch, a call, a return, a store, a free and a possibly trapping instruction), with
    the demand Demanded true true, since their bit patterns are observable or steer control; and
    the operands of an IOp with OExt, which may trap on the shape of its operands, with
-   Demanded false false. dexit n likewise, with Demanded true true.
+   Demanded false false. dexit n is the raw ssa_demand_view's exit operands, each with
+   Demanded true true, preserving their order and duplicates.
    dback e x NotDemanded = nil. For a demanded result and def x = Op o args in
    ssa_block_view ext P f:
    for o = OExt tag with float_ext_decode tag = Some (_, b) and args = [a1; a2], the pairs
    (a1, d1) and (a2, d2) with (d1, d2) = nan_back b d; for every other operator,
    the arguments with Demanded true true; for a Param or an Arbitrary definition, nothing.
    Omitting bottom pairs preserves their semantic demand contribution and establishes d_back_bot;
-   the separate dnec demands retain OExt trap-shape observations. *)
+   the separate dnec demands retain OExt trap-shape observations. Prove d_vars for every node,
+   including unreachable blocks, and use full-demand option equality for d_exits. *)
 ```
 
 ## Theorems
