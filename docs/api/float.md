@@ -12,14 +12,14 @@ It depends on Order (lattices and meanings), Views (`sparse_domain`), Analyses (
 framework of ANA-4) and `Examples.Ssa`, which supplies `OExt`, `VF32` and `VF64`.
 
 Conventions of this document:
-- **Axioms.** Flocq's operator lemmas rest on Stdlib's classical real numbers, so a theorem of
-  `Gaulois.Float` may depend on exactly these axioms and on no others:
+- **Axioms.** A theorem of `Gaulois.Float` may depend on exactly these axioms and on no others:
   `Stdlib.Reals.ClassicalDedekindReals.sig_forall_dec`,
-  `Stdlib.Reals.ClassicalDedekindReals.sig_not_dec`, and
-  `Stdlib.Logic.FunctionalExtensionality.functional_extensionality_dep`, the functional
-  extensionality that `Reals` uses. `gaulois check claims` allows exactly this list for
-  `Gaulois.Float`
-  theorems. A theorem of any other package depends on no axiom.
+  `Stdlib.Reals.ClassicalDedekindReals.sig_not_dec`,
+  `Stdlib.Logic.FunctionalExtensionality.functional_extensionality_dep`, and
+  `Stdlib.Logic.Classical_Prop.classic`. The pinned Flocq operations and bit decoders inherit
+  `classic` in addition to the classical real-number foundations. `gaulois check claims` must
+  allow exactly this list for `Gaulois.Float` theorems. A theorem of any other package depends
+  on no axiom. C56 records the owner's approval of `classic`; FLT-1 updates the checker.
 - **Sections.** FloatInterval.v, FloatOps.v and FloatNan.v each open `Section Float` with
   `Context {prec emax : Z} {Hprec : Prec_gt_0 prec} {Hmax : Prec_lt_emax prec emax}` and
   `Notation fl := (binary_float prec emax)`, and close it at the end of the file. Everything is
@@ -417,9 +417,9 @@ Card: FLT-1.
    `Prec_gt_0` and `Prec_lt_emax` are explicit, and the shape of the NaN-choice argument) follows
    the
    installed Flocq 4.2.2; the card adapts the signatures, not the statements.
-2. **Axiom names.** `Print Assumptions` on Flocq's operator lemmas at the pinned versions fixes the
-   exact names of the axioms of the classical reals. The list in the conventions is the allowance;
-   a theorem that depends on fewer is fine.
+2. **Axiom names.** The list in the conventions is the exact allowance for the pinned Flocq
+   dependencies; a theorem that depends on fewer is fine. `Print Assumptions` checks actual
+   theorem dependencies against it.
 3. **Operators not covered.** Conversions between integers and floats, `sqrt`, fused multiply-add
    and `min` and `max` have no operator or theorem here; a client that needs them extends `fbop`
    and every theorem that cases on it.

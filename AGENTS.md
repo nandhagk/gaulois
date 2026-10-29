@@ -36,8 +36,8 @@ End your report with the completion report of each skill applied. Do not use Pyt
 - Every `.v` basename is unique and begins with its package name. Theories contain no `Extract`
   directives; extraction choices belong to clients.
 - Prove every contracted claim. Do not add axioms, `Admitted`, `admit`, or `give_up`. The sole
-  exception is the exact Flocq-related axiom allowance for Float in C13; no other package may
-  depend on axioms. See `docs/trust.md`.
+  exception is the exact Flocq-related axiom allowance for Float in C13 and C56; no other package
+  may depend on axioms. See `docs/trust.md`.
 
 ## Work and verification
 

@@ -20,10 +20,14 @@ Outside Float, each `Theorem` must be closed under the global context. No new ax
 modules for those proofs. `gaulois check` audits kernel-reported assumptions as well as source
 hygiene and layout. Individual reports also record any separate `Print Assumptions` audits.
 
-C13 permits Float theorems to depend only on the exact classical real-number axioms used by Flocq:
-`ClassicalDedekindReals`'s `sig_forall_dec` and `sig_not_dec`, and the functional extensionality
-used by Reals. The Float contract specifies the precise names, and the claims checker permits them
-only for `Gaulois.Float`. This allowance does not extend to other packages.
+C13 and C56 permit `Gaulois.Float` theorems to depend only on these exact axioms:
+`Stdlib.Reals.ClassicalDedekindReals.sig_forall_dec`,
+`Stdlib.Reals.ClassicalDedekindReals.sig_not_dec`,
+`Stdlib.Logic.FunctionalExtensionality.functional_extensionality_dep`, and
+`Stdlib.Logic.Classical_Prop.classic`. Pinned Flocq operations and bit decoders inherit `classic`
+as well as the classical real-number foundations. The owner approves this additional dependency
+under C56. The claims checker must use the same exact list; its update remains part of FLT-1.
+This allowance does not extend to other packages, examples or tests.
 
 ## Producers and checkers
 
