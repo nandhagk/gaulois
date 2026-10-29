@@ -1,0 +1,7 @@
+Implement region summaries over the skeleton
+
+Add the summary algebra and fold for regions, including escaping-label inventories and completion summaries.
+Prove nesting, tree-depth, balanced-sequence and semantic laws, with computation-based boundary examples.
+
+Evidence  kernel-checked claim: `nix develop --no-update-lock-file -c env GAULOIS_MAX_RAM=4G just build theories/Views tests/Views` (exit 0); `nix develop --no-update-lock-file -c env GAULOIS_MAX_RAM=4G just check` (exit 0)
+Cards     VIEW-3
