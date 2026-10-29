@@ -1,0 +1,7 @@
+GRA-7: Add direct iterated-frontier queries
+
+The direct queries compute unpruned and live-pruned iterated frontiers without materializing every frontier.
+They use a shared depth-priority traversal and prove exactness for both closure relations.
+
+Evidence  kernel-checked claim and smoke check: `nix develop --no-update-lock-file -c env GAULOIS_MAX_RAM=4G just build theories/Graph tests/Graph` (0); `nix develop --no-update-lock-file -c env GAULOIS_MAX_RAM=4G just check` (0)
+Cards     GRA-7
