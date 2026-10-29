@@ -3386,6 +3386,9 @@ REW-7 owns the independent Order, SSA and word clients.
 
 ### `AnalysesSsaPreGraph.v` — ANA-16
 
+`frg_defs` and `frg_phi_needed` take explicit block and expression encodings;
+`frg_phi_sites` and its exactness theorem also take block-edge and variable encodings.
+
 - `pre_expression_view` — public declaration; see the SSA PRE contract.
 - `PreExpressionView` — public declaration; see the SSA PRE contract.
 - `pre_genkill` — public declaration; see the SSA PRE contract.

@@ -4191,6 +4191,8 @@ feasible executions. No general relational domain is assumed distributive.
 The statements are uncompiled contracts. This graph is an analysis representation, not an SSA
 construction or general SSA repair facility. The producer discovers a finite family of typed
 expression instances from the program's seeds; the caller does not supply that family.
+For the factored redundancy graph and expression-phi context, see
+[Kennedy et al., *Partial redundancy elimination in SSA form*][ssapre-paper].
 
 ```coq
 Record pre_expression_view (S O N E U C : Type) : Type := PreExpressionView {
@@ -4329,34 +4331,36 @@ analyses on those nodes. Reachable irreducible components away from entry are su
 
 
 ```coq
-Definition frg_defs {S O B BE N E V K C U}
+Definition frg_defs {S O B BE N E V K C U} (EB : encoding B) (EU : encoding U)
     (a : pre_expr_ssa S O B BE N E V K C U) (u : U) : list B.
-Inductive frg_phi_needed {S O B BE N E V K C U}
+Inductive frg_phi_needed {S O B BE N E V K C U} (EB : encoding B) (EU : encoding U)
     (a : pre_expr_ssa S O B BE N E V K C U) : U -> B -> Prop :=
-| frg_phi_seed : forall u d b, pre_expr_in_family a u -> In d (frg_defs a u) ->
-    in_df (block_graph (pre_ssa_points a)) d b -> frg_phi_needed a u b
-| frg_phi_iter : forall u d b, frg_phi_needed a u d ->
-    in_df (block_graph (pre_ssa_points a)) d b -> frg_phi_needed a u b
-| frg_phi_translate_seed : forall u b be u' b', frg_phi_needed a u b ->
+| frg_phi_seed : forall u d b, pre_expr_in_family a u -> In d (frg_defs EB EU a u) ->
+    in_df (block_graph (pre_ssa_points a)) d b -> frg_phi_needed EB EU a u b
+| frg_phi_iter : forall u d b, frg_phi_needed EB EU a u d ->
+    in_df (block_graph (pre_ssa_points a)) d b -> frg_phi_needed EB EU a u b
+| frg_phi_translate_seed : forall u b be u' b', frg_phi_needed EB EU a u b ->
     In be (edges_of (block_graph (pre_ssa_points a))) ->
     Graph.target (block_graph (pre_ssa_points a)) be = b ->
     pre_phi_translate a be u = Some u' ->
     in_df (block_graph (pre_ssa_points a)) (Graph.source (block_graph (pre_ssa_points a)) be) b' ->
-    frg_phi_needed a u' b'.
-Definition frg_phi_sites {S O B BE N E V K C U} (EB : encoding B)
-    (a : pre_expr_ssa S O B BE N E V K C U) (u : U) : FinSet.t B.
+    frg_phi_needed EB EU a u' b'.
+Definition frg_phi_sites {S O B BE N E V K C U} (EB : encoding B) (EBE : encoding BE)
+    (EV : encoding V) (EU : encoding U) (a : pre_expr_ssa S O B BE N E V K C U)
+    (u : U) : FinSet.t B.
 Theorem pre_expr_universe_exact {S O B BE N E V K C U} (EBE : encoding BE)
     (EV : encoding V) (EU : encoding U) (a : pre_expr_ssa S O B BE N E V K C U) :
   pre_expr_ssa_laws EV a ->
   NoDup (pre_expr_universe EBE EV EU a) /\
   forall u, In u (pre_expr_universe EBE EV EU a) <-> pre_expr_in_family a u.
 
-Theorem frg_phi_sites_exact {S O B BE N E V K C U} (EB : encoding B) (EV : encoding V)
-    (a : pre_expr_ssa S O B BE N E V K C U) :
+Theorem frg_phi_sites_exact {S O B BE N E V K C U} (EB : encoding B) (EBE : encoding BE)
+    (EV : encoding V) (EU : encoding U) (a : pre_expr_ssa S O B BE N E V K C U) :
   pre_expr_ssa_laws EV a ->
   ready EB (block_graph (pre_ssa_points a)) (prepare EB (block_graph (pre_ssa_points a))) ->
   forall u b, pre_expr_in_family a u ->
-    (FinSet.mem EB b (frg_phi_sites EB a u) = true <-> frg_phi_needed a u b).
+    (FinSet.mem EB b (frg_phi_sites EB EBE EV EU a u) = true <->
+      frg_phi_needed EB EU a u b).
 
 Theorem pre_phi_env_parameter {S O B BE N E V K C U} (EV : encoding V)
     (a : pre_expr_ssa S O B BE N E V K C U) :
@@ -4472,7 +4476,8 @@ Record frg_wf {S O B BE N E V K C U} (EB : encoding B) (EBE : encoding BE)
     | FrPhi b u => FinSet.mem (pair_encoding EB EU) (b,u) (frg_phi_index f) = true
     end;
   frg_phi_exact : forall b u, FinSet.mem (pair_encoding EB EU) (b,u) (frg_phi_index f) = true <->
-    pre_expr_in_family a u /\ pre_total_pure (pre_expression a) u = true /\ frg_phi_needed a u b;
+    pre_expr_in_family a u /\ pre_total_pure (pre_expression a) u = true /\
+    frg_phi_needed EB EU a u b;
   frg_occurrence_exact : forall e u, In e (edges_of (live_graph (point_model (pre_ssa_points a)))) ->
     pre_recomputed (pre_expression a) e = Some u -> pre_total_pure (pre_expression a) u = true ->
     exists d, Map.get EE e (frg_occurrence_index f) = Some d /\ In d (frg_versions f) /\
@@ -4582,7 +4587,7 @@ rename rules are:
    seeds the current unused phi before the frame is replaced. Exactly the paper's finite
    Rename initialization and scope restoration are performed; no CFG path is scanned in a loop.
 
-`frg_defs a u` is the deduplicated union of the entry block, blocks containing eligible real
+`frg_defs EB EU a u` is the deduplicated union of the entry block, blocks containing eligible real
 occurrences of `u`, and the SSA home blocks of every operand in `pre_operands a u`. In
 particular, operand definitions are seeds even when the predecessor computations have different
 translated identities. `frg_phi_sites` computes the least `frg_phi_needed` relation: each
@@ -4591,7 +4596,10 @@ predecessor block's frontier for its translated expression. The producer uses GR
 index and exact GRA-2f dominators with a deduplicated worklist over the finite expression/block
 universe. The entry sentinel's availability is exactly
 `pre_initial_available`, not automatically true. Only reachable block edges feed these sites.
+The block and expression encodings supply executable identity to `frg_defs`; `frg_phi_sites`
+also uses the block-edge and value encodings to compute the finite translated family.
 
+[ssapre-paper]: https://doi.org/10.1145/319301.319348
 
 
 ## ANA-15: SSA PRE placement and local realization
@@ -4602,6 +4610,7 @@ exact syntactic availability and anticipation. This first supported transformati
 pure, total expressions after existing edges and replaces existing expression evaluations with
 previously computed SSA values. It neither constructs SSA from arbitrary code nor exposes a
 general SSA repair, destruction or allocation utility.
+The [SSAPRE paper][ssapre-paper] supplies the placement context.
 
 ### Expression view and direct placement producer
 
