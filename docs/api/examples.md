@@ -203,7 +203,8 @@ Definition while_region_alg (prog : stmt) : summary_algebra atom expr (bool * li
 Definition while_effects : effects atom.
 Definition while_effects_view (prog : stmt) : effects_view (mstate store) atom unit.
 (* instr_at (Go p _ _) = the atom at p of to_skeleton prog, None at other positions or at Ret;
-   heap _ = tt; heap_agree s t = True; depth _ = 0 *)
+   heap _ = tt; heap_agree s t = (s = t); depth _ = 0.
+   While has no heap: this relation requires the same whole nonheap machine state. *)
 (* The neededness view: an output demands the variables of its operand, a branch the variables of
    its guard, an assignment x := e defines x and, when x is needed, demands the variables of e. *)
 Definition while_demand_view (prog : stmt) (init : store -> Prop) :
@@ -707,8 +708,9 @@ Theorem while_never_traps (prog : stmt) (init : store -> Prop) (m : mstate store
 ```
 Proof idea: the first from the shape of the table (`jump_effect` keeps the store, atoms always step
 or are the identity); the second by cases on the atoms; the third from `skeleton_view_laws_hold`
-and the second; the effects laws by cases on the atom at the position (`silent` only for
-`AOutput`); the demand laws by the per-atom agreement (an assignment reads the variables of its
+and the second; the effects laws by cases on the atom at the position (only `AOutput` emits an
+event); for `reads_frame`, substitute the state equality and use the given step and its
+successor; the demand laws by the per-atom agreement (an assignment reads the variables of its
 operand, a guard the variables of its condition) and `d_vars` from the program's variables; the
 gen/kill laws because an assignment changes only its variable; no atom traps, so no state is
 trapped. Card: EX-4.
@@ -742,7 +744,9 @@ changes only a dead variable. `while_dce_sound` is `dce_sound` for `KeepTraps` w
 no read, write, trap or event) and the dead-variable premise from the definition of `while_dce`,
 on the two skeleton machines started at the matched states of `match_state_initial`, which agree
 because they are equal; then `while_behaviour_transport` for each program with
-`same_behaviour_sym` and `same_behaviour_trans`. Card: EX-4.
+`same_behaviour_sym` and `same_behaviour_trans`. This effects-view equality does not replace the
+separate `demand_agreement` and `er_agree` relations: the erasure proof still matches states that
+may differ on dead variables. Card: EX-4.
 
 ```coq
 (** Instantiation, dense and structured liveness: two While runs whose stores agree on the live-in
