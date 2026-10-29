@@ -2204,7 +2204,10 @@ Contract: [Examples](examples.md).
 - `lcm_insert_safe` — Theorem; An accepted insertion is anticipated.
 - `lcm_delete_current` — Theorem; An accepted deletion has a current available value.
 
-### `AnalysesStructured.v` — ANA-2
+### `AnalysesStructured.v` — EX-4, ANA-2
+
+EX-4 owns `skel_vars`, `skel_vars_laws`, their constructors and projections, and `act_vars`;
+ANA-2 extends the file after EX-4 lands and owns the remaining declarations.
 
 - `skel_vars` — Record; Variable uses and definitions of skeleton actions.
 - `SkelVars` — Constructor; Constructs the skel vars record.
@@ -2213,6 +2216,7 @@ Contract: [Examples](examples.md).
 - `atom_trap_uses` — Field; Variables needed to determine an atom's trapping behaviour.
 - `guard_uses` — Field; Variables read by a skeleton guard.
 - `skel_vars_laws` — Record; Relates skeleton variable effects to client execution.
+- `Build_skel_vars_laws` — Constructor; Constructs the skeleton variable laws record.
 - `atom_frame` — Field; An atom changes only its declared definitions.
 - `atom_agrees` — Field; Equal atom inputs yield matching steps.
 - `guard_agrees` — Field; Equal guard inputs yield the same guard result.
@@ -3453,6 +3457,8 @@ REW-7 owns the independent Order, SSA and word clients.
 - `frg_defs` — public declaration; see the SSA PRE contract.
 - `frg_phi_needed` — public declaration; see the SSA PRE contract.
 - `frg_phi_seed` — public declaration; see the SSA PRE contract.
+- `frg_phi_operand_param` — constructor; Seeds a family expression at a listed non-entry
+  block that has one of its operands as a block parameter.
 - `frg_phi_iter` — public declaration; see the SSA PRE contract.
 - `frg_phi_translate_seed` — public declaration; see the SSA PRE contract.
 - `frg_phi_sites` — public declaration; see the SSA PRE contract.

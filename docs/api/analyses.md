@@ -43,7 +43,7 @@ Conventions, in addition to those of `views.md`:
 |---|---|---|
 | `AnalysesLiveness.v` | variable view, liveness, reaching definitions, must-equality, zero-since-entry | ANA-1 |
 | `AnalysesAvailable.v` | gen/kill view, available and very busy expressions, lazy code motion | ANA-1 |
-| `AnalysesStructured.v` | structured liveness, loop certificates, observers | ANA-2 |
+| `AnalysesStructured.v` | skeleton variables; liveness, certificates, observers | EX-4, ANA-2 |
 | `AnalysesCensus.v` | region table | ANA-2 |
 | `AnalysesValues.v` | operator bridge; numeric value analyses | EX-5a, ANA-3 |
 | `AnalysesPaths.v` | edge predicates, path facts, guard chains | ANA-3 |
@@ -283,6 +283,10 @@ Definition lcm_check {S O N E U C} {U1 U2 U3 : list U} (EU : encoding U)
 
 ### ANA-2: structured code
 
+EX-4 owns `skel_vars`, `skel_vars_laws` and `act_vars` in `AnalysesStructured.v`, including
+their constructors and projections. ANA-2 extends the same file after EX-4 lands and owns the
+remaining declarations in this section. Both cards use these same nominal interfaces.
+
 ```coq
 (* AnalysesStructured.v. Variables seen by a skeleton client. *)
 Record skel_vars (A G X : Type) : Type := SkelVars {
@@ -305,7 +309,7 @@ Record skel_vars_laws {A G St O X Cv} (C : skeleton_client A G St O) (sv : skel_
     (atom_trap C a st1 <-> atom_trap C a st2) /\ (atom_stop C a st1 <-> atom_stop C a st2);
   jump_keeps : forall p n st st' x, jump_effect C p n st st' -> look st' x = look st x
 }.
-(* The variables of one action, and of the statement whose trap or guard decides an exit. *)
+(* The variables of one action. *)
 Definition act_vars {A G X} (sv : skel_vars A G X) (act : action A G) : list X :=
   match act with
   | AAtom a => atom_uses sv a ++ atom_defs sv a
@@ -314,6 +318,7 @@ Definition act_vars {A G X} (sv : skel_vars A G X) (act : action A G) : list X :
   | AIndexAtLeast g _ => guard_uses sv g
   | AJump _ _ => nil
   end.
+(* The variables of the statement whose trap or guard decides an exit. *)
 Definition skel_exit_uses {A G X} (sv : skel_vars A G X) (prog : stmt A G) (n : skel_point) :
     list X :=
   match n with
@@ -4339,6 +4344,11 @@ Definition frg_defs {S O B BE N E V K C U} (EB : encoding B) (EU : encoding U)
     (a : pre_expr_ssa S O B BE N E V K C U) (u : U) : list B.
 Inductive frg_phi_needed {S O B BE N E V K C U} (EB : encoding B) (EU : encoding U)
     (a : pre_expr_ssa S O B BE N E V K C U) : U -> B -> Prop :=
+| frg_phi_operand_param : forall u b x, pre_expr_in_family a u ->
+    In b (Graph.nodes (block_graph (pre_ssa_points a))) ->
+    ~ In b (Graph.entries (block_graph (pre_ssa_points a))) ->
+    In x (pre_operands a u) -> In x (block_params (pre_ssa_points a) b) ->
+    frg_phi_needed EB EU a u b
 | frg_phi_seed : forall u d b, pre_expr_in_family a u -> In d (frg_defs EB EU a u) ->
     in_df (block_graph (pre_ssa_points a)) d b -> frg_phi_needed EB EU a u b
 | frg_phi_iter : forall u d b, frg_phi_needed EB EU a u d ->
@@ -4566,8 +4576,8 @@ enter event, its expression-phi definitions, instruction events in point order, 
 operand event per outgoing edge and target phi, then an exit event for each ending point and a
 leave event. Relevant alteration events occur at the corresponding point edge; every event is
 indexed once by the expression family and the original edge identity. Phi sites use the exact
-cross-translation IDF closure defined above. The graph has the single entry without incoming
-edges specified there; empty and unreachable components are outside this specialized backend.
+operand-parameter and cross-translation IDF closure defined above. The graph has the single entry
+without incoming edges specified there; empty and unreachable components are outside this backend.
 
 An implementation may keep a private event machine with persistent scoped snapshots. Its
 rename rules are:
@@ -4592,16 +4602,28 @@ rename rules are:
    Rename initialization and scope restoration are performed; no CFG path is scanned in a loop.
 
 `frg_defs EB EU a u` is the deduplicated union of the entry block, blocks containing eligible real
-occurrences of `u`, and the SSA home blocks of every operand in `pre_operands a u`. In
-particular, operand definitions are seeds even when the predecessor computations have different
-translated identities. `frg_phi_sites` computes the least `frg_phi_needed` relation: each
-expression's iterated frontier is included, and every phi operand recursively seeds the
-predecessor block's frontier for its translated expression. The producer uses GRA-5's frontier
-index and exact GRA-2f dominators with a deduplicated worklist over the finite expression/block
-universe. The entry sentinel's availability is exactly
-`pre_initial_available`, not automatically true. Only reachable block edges feed these sites.
+occurrences of `u`, and the SSA home blocks of every operand in `pre_operands a u`. Their
+frontiers seed placement even when predecessor computations have different translated identities.
+Separately, an operand that is a block parameter directly seeds a phi for that family expression
+at the listed nonentry block itself. `frg_phi_sites` computes exactly the least relation above:
+each seed's iterated frontier is included, and every phi operand recursively seeds the
+predecessor block's frontier for its translated expression. Prepare a value-to-parameter-block
+index once from listed nonentry blocks. Visit each family expression's ordered operands and use
+that index to emit deduplicated direct seeds, then add these to the worklist with frontier seeds.
+Do not rescan all block parameter lists per expression or during closure. The producer uses
+GRA-5's frontier index and exact GRA-2f dominators with a deduplicated worklist over the finite
+expression/block universe. Charge index and seed construction, including candidate pairs and
+emitted seeds, separately from reached closure nodes and arcs. The entry sentinel's availability
+is exactly `pre_initial_available`, not automatically true. Only reachable block edges feed the
+translation closure.
 The block and expression encodings supply executable identity to `frg_defs`; `frg_phi_sites`
 also uses the block-edge and value encodings to compute the finite translated family.
+
+`frg_phi_sites_exact` retains both directions for this enlarged relation. `frg_phi_exact` retains
+the same iff and filters family expressions by `pre_total_pure`; the direct seed itself has no
+purity premise. The new rule captures a join expression whose parameter translates to different
+incoming expressions. It does not by itself establish global placement sufficiency or optimality;
+the producer, rename, operand selection and down-safety obligations remain to be proved.
 
 [ssapre-paper]: https://doi.org/10.1145/319301.319348
 
@@ -4829,8 +4851,9 @@ edge, translates the operand expression, and records `PreInserted` for an insert
 otherwise it records the actual reaching `PreInitial`, `PreComputed`, or `PreMerged` version.
 It records the reaching version for each reload and deletes only an occurrence with a proved
 available, dominating version. The two result maps in `pre_plan` make phi selection and reloads
-reviewable. The direct producer builds the FRG, solves the reset phases, finalizes versions and
-returns those maps. It does not call a candidate checker as its primary implementation.
+reviewable. The direct producer builds the FRG, including ANA-16's operand-parameter phi seeds,
+solves the reset phases, finalizes versions and returns those maps. It does not call a candidate
+checker as its primary implementation.
 
 The proof must establish the paper's reset-closure invariants, actual per-edge translation,
 placement safety, every selected incoming version's dominance at that predecessor and each
