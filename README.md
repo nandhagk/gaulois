@@ -7,8 +7,8 @@ compiler, graph representation, control structure or word size. It is MIT licens
 A client supplies a graph and a sound transfer for each edge. For example, on the true edge of
 `x < 10`, an interval analysis can refine an unsigned `x` to `[0, 9]`; an impossible edge produces
 bottom. The library's intended solver returns a post-solution, and the view's soundness theorem
-connects that result to the client's semantics. This example describes the planned API; it is not
-yet an executable end-to-end client in this repository.
+connects that result to the client's semantics. The While reference client exercises several dense
+analyses; the interval example describes the intended general client API.
 
 Read [design](docs/design.md) for the architecture, [catalogue](docs/catalogue.md) for the scope,
 [trust](docs/trust.md) for evidence, and [workflow](docs/workflow.md) to build. The binding public
@@ -32,14 +32,15 @@ contracts are in [docs/api](docs/api/), with a [name index](docs/api/names.md). 
 
 ## Status
 
-At commit `b3e8d41` on 2026-10-29, the landed foundations include Collections, Order and Bits,
-numeric, wrapping interval and memory domain components, and the source and claims checking tool.
-Graph includes reachability, two dominance producers, SCCs, loops, WTO and colouring components.
-Fixpoint includes checking, worklist, local and nested WTO solvers. Rewrite includes sorted syntax,
-e-graph rebuilding, pattern matching, class analyses, bounded saturation and finite witness
-extraction. Rules includes stratified solving and indexed joins; basic semantic views and the Ssa
-toy language are also present. Landed cards report kernel-checked claims and computed examples
-for their assigned contracts; they do not establish the whole library. Most analyses, later views
-and clients remain planned. The run ledger records the changing card status; see
-[catalogue](docs/catalogue.md) for scope and [trust](docs/trust.md)
-for the evidence. Contracts not yet implemented are specifications, not compiled interfaces.
+At commit `f8f35c8` on 2026-10-29, the engines, views and toys milestone M2 is reached: all
+cards assigned to it have landed. Foundations, Graph, Fixpoint, domain components, stratified
+Rules solving and the Rewrite core through finite witness extraction are present. Landed analyses
+include dense dataflow, demand and sparse available/busy evaluation graphs. The While client has
+view proofs and dense analysis examples; the Ssa language is present, while its analysis clients
+remain in progress or planned. Typed extraction and a benchmark harness have landed.
+
+The snapshot has 71 of 100 cards landed. MemorySSA constructors, advanced analyses, remaining
+clients and Float remain pending. Landed cards report kernel-checked claims and computed examples
+for their assigned contracts; they do not establish the whole library. See
+[catalogue](docs/catalogue.md) for scope and [trust](docs/trust.md) for evidence. Contracts not yet
+implemented are specifications, not compiled interfaces.

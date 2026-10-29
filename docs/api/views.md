@@ -877,7 +877,7 @@ Record effects_laws {S O I H} (m : semantics S O) (en : endings S) (ef : effects
   frame_frame : forall s l s' i, reachable_state m s -> instr_at ev s = Some i -> step m s l s' ->
     calls ef i = false -> depth ev s' = depth ev s;
   call_returns : forall s l s' i, reachable_state m s -> instr_at ev s = Some i -> step m s l s' ->
-    calls ef i = true -> may_diverge ef i = false -> depth ev s' = S (depth ev s) ->
+    calls ef i = true -> may_diverge ef i = false -> depth ev s' = Datatypes.S (depth ev s) ->
     ~ diverges_within m (depth ev) (depth ev s') s'
 }.
 ```

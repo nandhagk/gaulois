@@ -5,12 +5,13 @@ proved theorem whose assumptions meet the policy below. A statement that compile
 it does not establish a proof. A smoke check reports an outcome on examples. An experiment reports
 measurements and does not prove a general complexity or soundness claim.
 
-At commit `b3e8d41` on 2026-10-29, landed card reports and independent reviews record focused
-builds,
-examples and assumption audits for their assigned claims. This is evidence under their stated
-premises, not a proof of unimplemented contracts. The API documents themselves are specifications
-and have not been compiled as a whole. The run ledger tracks landed and pending cards; FINAL is
-planned to check a fresh full build.
+At commit `f8f35c8` on 2026-10-29, M2 is reached. Landed card reports and independent reviews
+record targeted builds, examples, checks and assumption audits for their assigned claims. EX-4's
+report records 123 closed assumption checks and computed While examples; its review independently
+observed the repository check pass and inspected the worker's build and test evidence. These are
+incremental checks, not a fresh full build. They establish claims under their stated premises, not
+unimplemented contracts. The API documents are specifications and have not been compiled as a
+whole. FINAL is planned to check a fresh full build.
 
 ## Assumptions
 
@@ -35,8 +36,15 @@ producers need their own closed correctness proofs; checkers remain available fo
 cached candidates. Legacy MemorySSA byte preservation retains its stated stronger premises and
 requires a proved projection from the new version graph where applicable.
 
-The planned sign-separated bit-and-bounds domain requires direct reduction and transfer proofs.
-Its paper-inspired representation and specified strengthening are not evidence of those proofs.
+The sign-separated bit-and-bounds domain's landed card reports direct reduction and transfer
+proofs under its stated contracts. Its representation alone would not establish those proofs.
+
+`just check` compiles the selected generated closures before inspecting their fixed artifact
+inventory for `Obj.magic` and Rules universe enumeration. Standard erased-proof placeholders use
+`Obj.t` and `Obj.repr`; native natural numbers use an integer realization. The bounded benchmark
+inputs stay within native integer range, but arbitrary-size correspondence and source-to-native
+runtime correspondence are not proved. Generated code has localized warning exceptions; authored
+OCaml retains its warning policy.
 
 The behaviour theorem distinguishes the effect policies: retaining traps supports the stated
 behaviour equality; deleting unread traps supports the contract's conditional refinement. Proofs
