@@ -146,6 +146,7 @@ module Source = struct
   let extension = ".v"
   let float_package = "Float"
   let rewrite_package = "Rewrite"
+  let examples_package = "Examples"
 
   let packages =
     String.Set.of_list
@@ -163,7 +164,15 @@ module Source = struct
       ]
   ;;
 
-  let example_packages = String.Set.of_list [ "While"; "Ssa" ]
+  let example_directories = String.Set.of_list [ "While"; "Ssa" ]
+
+  let package ~root relative =
+    match root, String.split relative ~on:'/' with
+    | Root.Examples, directory :: _ :: _ when Set.mem example_directories directory ->
+      examples_package
+    | (Root.Theories | Root.Tests), package :: _ :: _ -> package
+    | Root.Examples, _ | (Root.Theories | Root.Tests), _ -> ""
+  ;;
 
   let load ~root ~file ~package =
     let%bind.Or_error source = Or_error.try_with (fun () -> In_channel.read_all file) in
@@ -194,11 +203,7 @@ module Source = struct
       let%bind.Or_error paths = files directory in
       List.map (List.sort paths ~compare:String.compare) ~f:(fun file ->
         let relative = String.chop_prefix_exn file ~prefix:[%string "%{directory}/"] in
-        let package =
-          match String.split relative ~on:'/' with
-          | package :: _ :: _ -> package
-          | _ -> ""
-        in
+        let package = package ~root relative in
         load ~root ~file ~package)
       |> Or_error.combine_errors)
     |> Or_error.combine_errors
@@ -207,6 +212,12 @@ module Source = struct
 
   let is_float ({ root; package; _ } : t) =
     Root.equal root Theories && String.equal package float_package
+  ;;
+
+  let is_production ({ root; _ } : t) =
+    match root with
+    | Theories | Examples -> true
+    | Tests -> false
   ;;
 end
 
@@ -537,7 +548,7 @@ module Hygiene = struct
     then
       if
         String.is_prefix name ~prefix:"Gaulois.Float."
-        && Source.Root.equal source.root Theories
+        && Source.is_production source
         && not (Source.is_float source)
       then Some "only Gaulois.Float may depend on Float"
       else None
@@ -621,7 +632,7 @@ module Hygiene = struct
          | "Declare" :: "Instance" :: _ -> Some "instance declaration introduces an axiom"
          | "Admit" :: _ -> Some "admitted Program obligation"
          | first :: _
-           when Source.Root.equal source.root Theories
+           when Source.is_production source
                 && (String.is_prefix first ~prefix:"Extract"
                     || Set.mem queries first
                     || (String.equal first "Recursive"
@@ -677,8 +688,9 @@ module Layout = struct
   let source ({ file; root; package; _ } : Source.t) =
     let allowed =
       match root with
-      | Theories | Tests -> Source.packages
-      | Examples -> Source.example_packages
+      | Theories -> Source.packages
+      | Tests -> Set.add Source.packages Source.examples_package
+      | Examples -> String.Set.singleton Source.examples_package
     in
     if not (Set.mem allowed package)
     then Diagnostic.error ~file ~line:1 "source must be placed under its declared package directory"
@@ -1177,17 +1189,45 @@ module Fixture = struct
   ;;
 
   let repository = Query.scratch
+  let while_file = "While/ExamplesWhileFixture.v"
+  let ssa_file = "Ssa/ExamplesSsaFixture.v"
+  let examples_test_file = "Examples/ExamplesTestFixture.v"
+
+  module Path = struct
+    type t =
+      { root : Source.Root.t
+      ; relative : Filename.t
+      }
+  end
+
+  let example_paths =
+    [ ({ root = Examples; relative = while_file } : Path.t)
+    ; ({ root = Examples; relative = ssa_file } : Path.t)
+    ; ({ root = Tests; relative = examples_test_file } : Path.t)
+    ]
+  ;;
 
   let source ?(root = Source.Root.Theories) ?(package = "Collections") ?(file = file) source =
     let sentences = Lex.scan ~file source |> Or_error.ok_exn in
     ({ file; root; package; source; sentences } : Source.t)
   ;;
 
+  let at ~root relative text =
+    let file = Filename.concat (Source.Root.to_string root) relative in
+    source ~root ~package:(Source.package ~root relative) ~file text
+  ;;
+
+  let examples text =
+    List.map example_paths ~f:(fun ({ root; relative } : Path.t) -> at ~root relative text)
+  ;;
+
   let with_repository ~f =
     Core_unix.mkdir_p Query.scratch;
     let directory = Filename_unix.temp_dir ~in_dir:Query.scratch "repository-" "" in
     let relative =
-      [ file; "examples/While/WhileFixture.v"; "tests/Collections/CollectionsTestFixture.v" ]
+      [ file; "tests/Collections/CollectionsTestFixture.v" ]
+      @ List.map example_paths ~f:(fun ({ root; relative } : Path.t) ->
+        Filename.concat (Source.Root.to_string root) relative)
     in
     let files = List.map relative ~f:(Filename.concat directory) in
     Exn.protect
@@ -1198,7 +1238,9 @@ module Fixture = struct
         f directory)
       ~finally:(fun () ->
         List.iter files ~f:Core_unix.unlink;
-        List.iter files ~f:(fun file -> Core_unix.rmdir (Filename.dirname file));
+        List.map files ~f:Filename.dirname
+        |> List.dedup_and_sort ~compare:String.compare
+        |> List.iter ~f:Core_unix.rmdir;
         List.iter Source.Root.all ~f:(fun root ->
           Core_unix.rmdir (Filename.concat directory (Source.Root.to_string root)));
         Core_unix.rmdir directory)
@@ -1407,7 +1449,8 @@ Module Inner. End Inner. Module Alias := Inner. End Outer.|}
 let%expect_test "every authored source root discovers and inspects its theorems" =
   let module Discovery = struct
     type t =
-      { root : Source.Root.t
+      { file : Filename.t
+      ; root : Source.Root.t
       ; package : string
       ; claims : Claim.t list
       }
@@ -1416,15 +1459,23 @@ let%expect_test "every authored source root discovers and inspects its theorems"
   in
   Fixture.with_repository ~f:(fun repository ->
     let sources = Source.discover repository |> Or_error.ok_exn in
-    List.iter sources ~f:(fun ({ root; package; _ } as source : Source.t) ->
+    List.iter sources ~f:(fun ({ file; root; package; _ } as source : Source.t) ->
+      let file = String.chop_prefix_exn file ~prefix:[%string "%{repository}/"] in
       let claims = Claim.discover source |> Or_error.ok_exn in
-      print_s [%sexp ({ root; package; claims } : Discovery.t)]);
+      print_s [%sexp ({ file; root; package; claims } : Discovery.t)]);
     print_s [%sexp (Claims.run ~repository sources : unit Or_error.t)]);
   [%expect
     {|
-    ((root Theories) (package Collections) (claims (((name closed) (line 1)))))
-    ((root Examples) (package While) (claims (((name closed) (line 1)))))
-    ((root Tests) (package Collections) (claims (((name closed) (line 1)))))
+    ((file theories/Collections/CollectionsFixture.v) (root Theories)
+     (package Collections) (claims (((name closed) (line 1)))))
+    ((file examples/Ssa/ExamplesSsaFixture.v) (root Examples) (package Examples)
+     (claims (((name closed) (line 1)))))
+    ((file examples/While/ExamplesWhileFixture.v) (root Examples)
+     (package Examples) (claims (((name closed) (line 1)))))
+    ((file tests/Collections/CollectionsTestFixture.v) (root Tests)
+     (package Collections) (claims (((name closed) (line 1)))))
+    ((file tests/Examples/ExamplesTestFixture.v) (root Tests) (package Examples)
+     (claims (((name closed) (line 1)))))
     (Ok ())
     |}]
 ;;
@@ -1791,4 +1842,183 @@ let%expect_test "unused classical import is a hygiene failure even for a kernel 
       (problem
        "axiom-bearing Stdlib import outside Float: Stdlib.Logic.Classical_Prop")))
     |}]
+;;
+
+let%expect_test "Examples production subdirectories and computed test directory use Examples prefix"
+  =
+  let sources = Fixture.examples Fixture.closed in
+  print_s [%sexp (Layout.run sources : unit Or_error.t)];
+  print_s [%sexp (Hygiene.run sources : unit Or_error.t)];
+  [%expect
+    {|
+    (Ok ())
+    (Ok ())
+    |}]
+;;
+
+let%expect_test "Examples paths reject language prefixes and wrong or unknown directories" =
+  List.iter
+    [ Fixture.at ~root:Examples "While/WhileWrong.v" Fixture.closed
+    ; Fixture.at ~root:Examples "Ssa/SsaWrong.v" Fixture.closed
+    ; Fixture.at ~root:Tests "Examples/SsaWrongTest.v" Fixture.closed
+    ; Fixture.at ~root:Examples "Collections/ExamplesWrong.v" Fixture.closed
+    ; Fixture.at ~root:Examples "Unknown/ExamplesUnknown.v" Fixture.closed
+    ; Fixture.at ~root:Examples "ExamplesMisplaced.v" Fixture.closed
+    ; Fixture.at ~root:Theories "Examples/ExamplesWrongTheory.v" Fixture.closed
+    ; Fixture.at ~root:Tests "While/ExamplesWrongTest.v" Fixture.closed
+    ; Fixture.at ~root:Tests "Unknown/ExamplesUnknownTest.v" Fixture.closed
+    ; Fixture.at ~root:Theories "CollectionsMisplaced.v" Fixture.closed
+    ; Fixture.at ~root:Tests "ExamplesMisplacedTest.v" Fixture.closed
+    ]
+    ~f:(fun source -> print_s [%sexp (Layout.run [ source ] : unit Or_error.t)]);
+  [%expect
+    {|
+    (Error
+     ((file examples/While/WhileWrong.v) (line 1) (claim ())
+      (problem "Rocq basename must start with package Examples")))
+    (Error
+     ((file examples/Ssa/SsaWrong.v) (line 1) (claim ())
+      (problem "Rocq basename must start with package Examples")))
+    (Error
+     ((file tests/Examples/SsaWrongTest.v) (line 1) (claim ())
+      (problem "Rocq basename must start with package Examples")))
+    (Error
+     ((file examples/Collections/ExamplesWrong.v) (line 1) (claim ())
+      (problem "source must be placed under its declared package directory")))
+    (Error
+     ((file examples/Unknown/ExamplesUnknown.v) (line 1) (claim ())
+      (problem "source must be placed under its declared package directory")))
+    (Error
+     ((file examples/ExamplesMisplaced.v) (line 1) (claim ())
+      (problem "source must be placed under its declared package directory")))
+    (Error
+     ((file theories/Examples/ExamplesWrongTheory.v) (line 1) (claim ())
+      (problem "source must be placed under its declared package directory")))
+    (Error
+     ((file tests/While/ExamplesWrongTest.v) (line 1) (claim ())
+      (problem "source must be placed under its declared package directory")))
+    (Error
+     ((file tests/Unknown/ExamplesUnknownTest.v) (line 1) (claim ())
+      (problem "source must be placed under its declared package directory")))
+    (Error
+     ((file theories/CollectionsMisplaced.v) (line 1) (claim ())
+      (problem "source must be placed under its declared package directory")))
+    (Error
+     ((file tests/ExamplesMisplacedTest.v) (line 1) (claim ())
+      (problem "source must be placed under its declared package directory")))
+    |}]
+;;
+
+let%expect_test "Examples basename uniqueness spans both production subdirectories and tests" =
+  let basename = "ExamplesDuplicate.v" in
+  let sources =
+    List.map Fixture.example_paths ~f:(fun ({ root; relative } : Fixture.Path.t) ->
+      let relative = Filename.concat (Filename.dirname relative) basename in
+      Fixture.at ~root relative Fixture.closed)
+  in
+  print_s [%sexp (Layout.run sources : unit Or_error.t)];
+  [%expect
+    {|
+    (Error
+     ("duplicate Rocq basename" (basename ExamplesDuplicate.v)
+      (files
+       (examples/While/ExamplesDuplicate.v examples/Ssa/ExamplesDuplicate.v
+        tests/Examples/ExamplesDuplicate.v))))
+    |}]
+;;
+
+let%expect_test "Examples production sources retain theory hygiene and Float dependency boundaries" =
+  List.iter
+    [ "Print nat."
+    ; "Extraction Language OCaml."
+    ; "From Gaulois.Float Require Import FloatFixture."
+    ]
+    ~f:(fun text ->
+      List.iter
+        (List.take (Fixture.examples text) 2)
+        ~f:(fun source -> print_s [%sexp (Hygiene.run [ source ] : unit Or_error.t)]));
+  [%expect
+    {|
+    (Error
+     ((file examples/While/ExamplesWhileFixture.v) (line 1) (claim ())
+      (problem
+       "theory extraction or query command belongs in a client or scratch file")))
+    (Error
+     ((file examples/Ssa/ExamplesSsaFixture.v) (line 1) (claim ())
+      (problem
+       "theory extraction or query command belongs in a client or scratch file")))
+    (Error
+     ((file examples/While/ExamplesWhileFixture.v) (line 1) (claim ())
+      (problem
+       "theory extraction or query command belongs in a client or scratch file")))
+    (Error
+     ((file examples/Ssa/ExamplesSsaFixture.v) (line 1) (claim ())
+      (problem
+       "theory extraction or query command belongs in a client or scratch file")))
+    (Error
+     ((file examples/While/ExamplesWhileFixture.v) (line 1) (claim ())
+      (problem "only Gaulois.Float may depend on Float")))
+    (Error
+     ((file examples/Ssa/ExamplesSsaFixture.v) (line 1) (claim ())
+      (problem "only Gaulois.Float may depend on Float")))
+    |}]
+;;
+
+let%expect_test "Examples and computed test theorems reject the exact Float real axioms" =
+  List.iter (Fixture.examples Fixture.reals) ~f:(fun source ->
+    print_s [%sexp (Claim.discover source : Claim.t list Or_error.t)];
+    print_s [%sexp (Claims.source ~repository:Fixture.repository source : unit Or_error.t)]);
+  [%expect
+    {|
+    (Ok (((name real_claim) (line 1))))
+    (Error
+     ((file examples/While/ExamplesWhileFixture.v) (line 1) (claim (real_claim))
+      (problem
+       "theorem depends on axioms: ClassicalDedekindReals.sig_forall_dec, FunctionalExtensionality.functional_extensionality_dep")))
+    (Ok (((name real_claim) (line 1))))
+    (Error
+     ((file examples/Ssa/ExamplesSsaFixture.v) (line 1) (claim (real_claim))
+      (problem
+       "theorem depends on axioms: ClassicalDedekindReals.sig_forall_dec, FunctionalExtensionality.functional_extensionality_dep")))
+    (Ok (((name real_claim) (line 1))))
+    (Error
+     ((file tests/Examples/ExamplesTestFixture.v) (line 1) (claim (real_claim))
+      (problem
+       "theorem depends on axioms: ClassicalDedekindReals.sig_forall_dec, FunctionalExtensionality.functional_extensionality_dep")))
+    |}]
+;;
+
+let%expect_test "Examples and test logical module paths resolve compiled theorem dependencies" =
+  let result =
+    Query.with_workspace ~f:(fun repository ->
+      let sources = Fixture.examples Fixture.closed in
+      let args = Query.load_paths repository in
+      let output = Filename.concat repository "Compile.log" in
+      let%bind.Or_error () =
+        List.fold_result sources ~init:() ~f:(fun () ({ file; source; _ } : Source.t) ->
+          let file = Filename.concat repository file in
+          Core_unix.mkdir_p (Filename.dirname file);
+          Out_channel.write_all file ~data:source;
+          let%map.Or_error _ =
+            Query.run_process ~mode:Compile ~directory:repository ~args:(args @ [ file ]) ~output
+          in
+          ())
+      in
+      let linked =
+        {|From Gaulois.Examples.While Require Import ExamplesWhileFixture.
+From Gaulois.Examples.Ssa Require Import ExamplesSsaFixture.
+From Gaulois.Tests.Examples Require Import ExamplesTestFixture.
+Theorem linked : True /\ True /\ True.
+Proof.
+  exact (conj ExamplesWhileFixture.closed
+    (conj ExamplesSsaFixture.closed ExamplesTestFixture.closed)).
+Qed.|}
+      in
+      let sources = Fixture.examples linked in
+      let%bind.Or_error () = Layout.run sources in
+      let%bind.Or_error () = Hygiene.run sources in
+      Claims.run ~repository sources)
+  in
+  print_s [%sexp (result : unit Or_error.t)];
+  [%expect {| (Ok ()) |}]
 ;;
