@@ -64,6 +64,8 @@ Order record. Stdlib imports (`ZArith`, `List`, `Bool`, `Sorting.Sorted`) are im
 | `DomainsSign.v` | signs | DOM-1a |
 | `DomainsKnownBits.v` | known bits (tnum) | DOM-2 |
 | `DomainsKnownBitsFast.v` | selectable tnum multiplication | DOM-8 |
+| `DomainsSignedBounds.v` | sign-separated bit and interval reduction | DOM-9 |
+| `DomainsSignedBoundsDomain.v` | selectable signed bit-and-bounds domain and queries | DOM-9 |
 | `DomainsWrapped.v` | wrapping intervals with a widening rank | DOM-3 |
 | `DomainsCongruence.v` | congruences | DOM-4 |
 | `DomainsProduct.v` | the reduced-product functor and its three reductions | DOM-4 |
@@ -1161,6 +1163,9 @@ End SymbolicLaws.
   Mathematics, 1989, which also gives the interval and congruence reduction.
 - **Reduced product.** Cousot and Cousot 1979; Cousot, Cousot and Mauborgne, "The reduced product of
   abstract domains and the combination of decision procedures", FoSSaCS 2011.
+- **Sign-separated bits and bounds.** Fan et al., "Program Analysis Combining Generalized
+  Bit-Level and Word-Level Abstractions", ISSTA 2025, DOI 10.1145/3728905. DOM-9 specifies a
+  Gaulois adaptation and a stronger reduction; it does not claim full paper transfer parity.
 - **Demanded bits.** LLVM's `DemandedBits` analysis, stated here as a relational agreement so that
   soundness is a theorem about two evaluations, with forward constants as premises.
 - **Memory.** Site-and-offset addresses as in Miné, "Field-sensitive value analysis of embedded C
@@ -1189,6 +1194,10 @@ End SymbolicLaws.
   one `Table.get` and at most one `Table.set`.
 - Prepared indexes: `numbering_wf` (a table with its next number) and `ranges_wf` (the canonical
   list), with agreement lemmas `intern_injective` and `ranges_ext`.
+- DOM-9's feasible-extremum search visits at most `w` positions with O(w)-bit operands. A transfer
+  uses at most eight input-branch combinations, plus component costs and reduction. The proposed
+  join widening may require exponentially many improvements in `w`; these are cost estimates,
+  not benchmark results or a whole-analysis complexity claim.
 
 ## Open questions
 
@@ -1222,3 +1231,147 @@ Renames and requests that follow from this document (document, old name or text,
 6. TASKS.md, LEDGER.md and the cards: DOM-1 becomes DOM-1a (ORD-1, BIT-1) and DOM-1b (DOM-1a);
    VIEW-4 and ANA-8 list DOM-1a; DOM-2 and DOM-3 list DOM-1a; DOM-4 and DOM-6 also list DOM-1b;
    DOM-7 lists BIT-1 (`expr_key` uses `op_encoding` and `commutative`).
+
+## Selectable signed bit-and-bounds domain (DOM-9)
+
+### Representation and meaning
+
+```coq
+Inductive sb_half : Type :=
+  | SBEmpty
+  | SBRange (bits : tnum) (lo hi : Z).
+
+Record signed_bounds : Type := SignedBounds {
+  sb_zero : sb_half;
+  sb_one : sb_half
+}.
+
+Definition sb_bit_gamma (w : width) (sign : bool) (h : sb_half) (z : Z) : Prop.
+Definition sb_interval_gamma (w : width) (sign : bool) (h : sb_half) (z : Z) : Prop.
+Definition sb_half_gamma (w : width) (sign : bool) (h : sb_half) (z : Z) : Prop.
+Definition signed_bounds_gamma (w : width) (a : signed_bounds) (z : Z) : Prop.
+Definition sb_reduce_half (w : width) (sign : bool) (h : sb_half) : sb_half.
+Definition signed_bounds_reduce (w : width) (a : signed_bounds) : signed_bounds.
+```
+
+For either component gamma, require `is_word w z` and the most significant bit of z equal to
+`sign`. `SBEmpty` means false in both. In `SBRange t lo hi`, bit gamma additionally means
+`tnum_gamma w t z`; interval gamma additionally means `lo <= z <= hi`. Half gamma is their
+conjunction, and signed-bounds gamma is the union of the half gammas, with false/true sign for
+`sb_zero`/`sb_one`. Thus out-of-range raw bounds are intersected with the hemisphere, not wrapped;
+tnum masks have exactly DOM-2's modulo-width meaning. The stored constructor has no width: its
+meaning and all operations take the width explicitly.
+
+For a half, let S be exactly the finite words satisfying half gamma. If S is empty, reduction
+returns `SBEmpty`. Otherwise return `SBRange t l u` with l and u respectively the minimum and
+maximum of S, and t the unique normalized mask identifying exactly the bits constant throughout
+S (and leaving all other bits unknown). Thus its two components are their independently least
+abstractions of S. Normalize masks to w bits and use a single canonical empty representation.
+`signed_bounds_reduce` applies this separately to both halves.
+
+Implement S's extrema by traversing word bits most-significant first with tight lower/upper
+constraints and known bits. Choose a feasible 0 or 1 and retain enough state to backtrack or use
+dynamic feasibility; return `None` exactly when no word exists. Do not enumerate words in the
+implementation. Compute the tnum hull by intersecting the old masks with the interval bit hull
+of the computed feasible extrema, and prove that equality against the set definition above.
+An independently proved equivalent bit algorithm is permitted. This strengthening is not a
+claim that the paper's artifact uses nearest-feasible endpoints.
+
+```coq
+Theorem sb_reduce_half_gamma : forall w s h z,
+  sb_half_gamma w s (sb_reduce_half w s h) z <-> sb_half_gamma w s h z.
+Theorem sb_reduce_half_idempotent : forall w s h,
+  sb_reduce_half w s (sb_reduce_half w s h) = sb_reduce_half w s h.
+Theorem sb_reduce_half_hulls : forall w s h q,
+  (forall x, sb_half_gamma w s h x -> sb_bit_gamma w s q x) ->
+  (forall z, sb_bit_gamma w s (sb_reduce_half w s h) z -> sb_bit_gamma w s q z).
+Theorem sb_reduce_half_interval_hull : forall w s h q,
+  (forall x, sb_half_gamma w s h x -> sb_interval_gamma w s q x) ->
+  (forall z, sb_interval_gamma w s (sb_reduce_half w s h) z ->
+    sb_interval_gamma w s q z).
+Theorem signed_bounds_reduce_gamma : forall w a z,
+  signed_bounds_gamma w (signed_bounds_reduce w a) z <-> signed_bounds_gamma w a z.
+Theorem signed_bounds_reduce_idempotent : forall w a,
+  signed_bounds_reduce w (signed_bounds_reduce w a) = signed_bounds_reduce w a.
+```
+
+The hull claims quantify over arbitrary raw `q` and only words in the indicated hemisphere.
+They are stronger than soundness or stability of a particular sequence of exchanges. They do
+not state that arbitrary operation transfer results are best abstractions of concrete results.
+The raw-input conventions ensure the empty case is covered, including contradictory tnums.
+
+### Lattice, operations and consumers
+
+```coq
+Definition signed_bounds_lattice (w : width) : lattice signed_bounds.
+Definition signed_bounds_wrank (w : width) :
+  bounded_widening_rank (signed_bounds_lattice w).
+Definition signed_bounds_domain : word_domain signed_bounds.
+Definition signed_bounds_numeric : numeric_domain (tagged signed_bounds) :=
+  tagged_domain signed_bounds_domain.
+Definition signed_bounds_capped (maxw : width) :
+  numeric_domain (@capped signed_bounds maxw) := capped_domain signed_bounds_domain maxw.
+
+Theorem signed_bounds_laws : forall w, lattice_laws (signed_bounds_lattice w).
+Theorem signed_bounds_word_laws : word_laws signed_bounds_domain signed_bounds_gamma.
+Theorem signed_bounds_numeric_laws :
+  numeric_laws signed_bounds_numeric (tagged_gamma signed_bounds_gamma).
+Theorem signed_bounds_capped_laws : forall maxw,
+  numeric_laws (signed_bounds_capped maxw) (capped_gamma signed_bounds_gamma maxw).
+```
+
+Every public lattice operation first reduces its raw input. The preorder compares the normalized
+bit and interval components for inclusion separately per sign, with empty below all. Bottom has
+both halves empty. Join takes the bit-mask join and interval hull per hemisphere, then reduces.
+Widen is join; narrow returns its first input reduced. This finite-width widening is sound and
+may take exponentially many strict interval-bound improvements in width; it deliberately omits
+the paper's faster interval-doubling widening. Provide a decreasing bounded widening rank for
+this exact definition, accounting for interval range growth and loss of fixed bits. Do not use
+the bare weak lattice laws to infer leastness: prove any component hull or least join directly.
+`pmeet` intersects both masks and intervals per sign and reduces. `ptop` has full hemispheres;
+`pconst` creates the wrapped singleton in its sign hemisphere.
+
+For forward transfer, split each input into at most two hemisphere branches, apply the landed
+`known_bits_domain` and `wrapped_domain` transfer to the corresponding masks and non-wrapping
+interval arcs, split each result into its output sign hemispheres, join all combinations, and
+reduce. A circular output arc can intersect a hemisphere in two pieces; take the enclosing
+interval hull of both pieces, rather than assuming their union is a single interval. There are
+at most 2^3 combinations for valid Bits arity. The choice of widening and
+the existing component transfers are a deliberate Gaulois adaptation; they do not promise the
+paper's full tnum-plus operation precision. A result with a `WFull` arc splits to full intervals
+in both output signs. For a malformed shape, use a sound fallback satisfying all `word_laws`.
+For backward transfer, run each component `passume` on every input-branch combination and each
+result branch, then intersect every returned branch with the corresponding original branch,
+join all alternatives per operand and reduce. If the shape cannot be safely matched, return
+the original operands reduced, preserving the exact list length. This guarantees
+length/refinement even where evaluation is None.
+The definitions must respect the existing component total zero-division, rotation, shift and
+width-changing semantics. No non-emptiness assumption may be inferred from a merely consistent
+mask without checking its interval intersection.
+
+### Pair-aware queries
+
+Queries consume a whole reduced pair, not one constituent in isolation. They return `None` for
+an empty selected sign. Otherwise unsigned bounds are the normalized inclusive endpoints, and
+the known-bit answer is the normalized least mask for that half.
+
+```coq
+Definition signed_bounds_query (w : width) (a : signed_bounds) (s : bool) :
+  option (tnum * Z * Z).
+Theorem signed_bounds_query_sound : forall w a s t lo hi z,
+  signed_bounds_query w a s = Some (t, lo, hi) ->
+  sb_half_gamma w s (if s then sb_one a else sb_zero a) z ->
+  tnum_gamma w t z /\ lo <= z <= hi.
+Theorem signed_bounds_query_empty : forall w a s,
+  signed_bounds_query w a s = None <->
+  forall z, ~ sb_half_gamma w s (if s then sb_one a else sb_zero a) z.
+Theorem signed_bounds_query_bounds_exact : forall w a s t lo hi,
+  signed_bounds_query w a s = Some (t, lo, hi) ->
+  sb_half_gamma w s (if s then sb_one a else sb_zero a) lo /\
+  sb_half_gamma w s (if s then sb_one a else sb_zero a) hi.
+```
+
+For signed endpoints the consumer applies the existing `signed w` to these unsigned endpoints;
+within each sign hemisphere the ordering is unchanged. Tagged clients pattern-match `TVal w a`,
+and capped clients project the underlying tagged value; `TBot` has no values, while `TAny` has
+no width-specific pair to query. No generic API record change is required.

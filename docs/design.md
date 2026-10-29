@@ -59,3 +59,6 @@ Prepared indexes carry agreement lemmas; the design avoids list scans inside loo
 binary fuel or well-founded recursion, and extraction directives live outside theories. Clients own
 summary contents, contexts, effect policies and invalidation; rechecking a changed program is one
 way to validate a cached result.
+
+The planned sign-separated bit-and-bounds domain is an additional client choice. Its per-sign
+reduction and queries use both components; it does not replace the circular-interval product.

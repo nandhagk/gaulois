@@ -35,6 +35,9 @@ producers need their own closed correctness proofs; checkers remain available fo
 cached candidates. Legacy MemorySSA byte preservation retains its stated stronger premises and
 requires a proved projection from the new version graph where applicable.
 
+The planned sign-separated bit-and-bounds domain requires direct reduction and transfer proofs.
+Its paper-inspired representation and specified strengthening are not evidence of those proofs.
+
 The behaviour theorem distinguishes the effect policies: retaining traps supports the stated
 behaviour equality; deleting unread traps supports the contract's conditional refinement. Proofs
 about examples demonstrate the toy clients under their own semantics, not arbitrary client code.

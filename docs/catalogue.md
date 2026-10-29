@@ -18,7 +18,8 @@ run ledger is the current card-by-card status.
 - **Structured:** liveness with loop certificates and region summaries including
   normal completion, labels, nesting and height.
 - **Values:** sparse conditional constant propagation, known bits, wrapping intervals, reduced
-  products, edge predicates, path facts and guard chains.
+  products, a selectable sign-separated bit-and-bounds domain, edge predicates, path facts and
+  guard chains.
 - **Neededness:** dead values, demanded bits, aggressive dead code and observable bits.
 - **Equality:** dominator-scoped value numbering, optimistic GVN, loop invariance and generic
   directly proved bounded e-graphs with checked explanations.

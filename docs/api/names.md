@@ -3577,3 +3577,22 @@ REW-7 owns the independent Order, SSA and word clients.
 - `pre_local_endings` — public declaration; see the SSA PRE contract.
 - `ssa_pre_cache_invariant` — public declaration; see the SSA PRE contract.
 - `ssa_pre_semantics` — public declaration; see the SSA PRE contract.
+
+### `DomainsSignedBounds.v` — DOM-9
+
+- `sb_half`, `SBEmpty`, `SBRange` — Inductive type and constructors; one sign hemisphere.
+- `signed_bounds`, `SignedBounds`, `sb_zero`, `sb_one` — Record, constructor and fields.
+- `sb_bit_gamma`, `sb_interval_gamma`, `sb_half_gamma`, `signed_bounds_gamma` — Definitions; meanings.
+- `sb_reduce_half`, `signed_bounds_reduce` — Definitions; exact component hull reduction.
+- `sb_reduce_half_gamma`, `sb_reduce_half_idempotent`, `sb_reduce_half_hulls` — Theorems.
+- `sb_reduce_half_interval_hull`, `signed_bounds_reduce_gamma` — Theorems.
+- `signed_bounds_reduce_idempotent` — Theorem.
+
+### `DomainsSignedBoundsDomain.v` — DOM-9
+
+- `signed_bounds_lattice`, `signed_bounds_wrank` — Definitions; lattice and widening rank.
+- `signed_bounds_domain`, `signed_bounds_numeric`, `signed_bounds_capped` — Definitions; domains.
+- `signed_bounds_laws`, `signed_bounds_word_laws`, `signed_bounds_numeric_laws` — Theorems.
+- `signed_bounds_capped_laws` — Theorem.
+- `signed_bounds_query` — Definition; reduced per-sign bit and bound query.
+- `signed_bounds_query_sound`, `signed_bounds_query_empty`, `signed_bounds_query_bounds_exact` — Theorems.
