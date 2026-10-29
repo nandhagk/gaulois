@@ -5159,16 +5159,22 @@ Theorem ssa_pre_semantics {S O B BE N E NT ET V K U C} (EB : encoding B) (EBE : 
 ```
 
 The proof must establish placement legality, extend the finite availability invariant along
-each projected edge using the source value fields, derive the local kept/insert/replace/phi
-cases and construct the macro target view on the original graph. Apply `agreement_simulation2`
-to the source and macro view; compose with `stuttering_same_behaviour` for the bounded
-administrative refinement to the real target. Supply both explicit stuck matches:
-`pre_local_endings` covers related boundary states, and `pre_local_progress` provides a step at
-each administrative state and a decreasing measure
-to construct a finite silent path to a boundary. Progress alone does not establish that the
-boundary is related to the required source state. Prove the matching relation and endpoint
-conditions for the same path, accounting for every nondeterministic administrative choice; if
-the existing local laws do not suffice, report the precise gap for an owner ruling.
+each projected edge using the source value fields and derive the local kept/insert/replace/phi
+cases. Prove behavior correspondence by grouping actual target paths into complete macros.
+For each completed target macro, match its particular edge, event list and boundary endpoint
+with a source step and preserve the cache invariant for that paired history. In the other
+direction, match each source step with an actual complete target macro. Account for every
+nondeterministic target path; do not select a source successor before the target path completes
+and then assume that every administrative continuation reaches an agreeing endpoint.
+
+Handle target prefixes ending inside a macro by extending their actual silent administrative
+path to a boundary using `pre_local_progress`; preserve the prefix trace. Prove both ending
+directions, including stuck: `pre_local_endings` applies at paired boundaries, and an
+administrative state is running and has no ending. Prove divergence correspondence in both
+directions, using the decreasing measure to rule out an infinite administrative suffix and
+retaining every finite trace prefix. These are constructive proof obligations, not a claim that
+progress alone proves the correspondence. If the existing laws do not suffice, report the
+precise gap for an owner ruling.
 Equal events, endings including traps and resource stops, finite prefixes and divergence
 are required. A client may only discharge totality and resource neutrality with actual laws for
 its semantics; the placement proof itself cannot establish them. The local laws are proof
@@ -5176,5 +5182,4 @@ obligations for a concrete client, not an implementation result.
 
 A source edge that changes an expression despite a false kill flag can leave a cached value
 stale. The source value fields exclude this mutation and preserve generated values across the
-actual step. They do not establish the full theorems or discharge the independent same-path
-administrative coupling obligation above.
+actual step. They do not establish the full theorems or the path correspondence above.
