@@ -413,6 +413,16 @@ Definition numeric_problem {S O N E V K C A} (ND : numeric_domain A) (G : concre
 (* SCCP, known bits, wrapping intervals, bits x interval and interval x congruence are
    numeric_problem with the numeric_domain of DOM-1 (constants), DOM-2, DOM-3 and DOM-4 (the
    reduced products), each with its numeric_laws; the width plumbing is `tagged_domain`. *)
+(* DOM-4 product payload meanings include is_word at the explicit width. Tagged numeric meanings
+   already impose that condition on TVal; product_tagged_gamma_equiv states agreement with the
+   former intersection meaning. Generic analyses and component meanings retain their laws. A
+   client-supplied constant product needs const_reduction_laws in addition to word_laws. *)
+(* The Ssa refined point model uses a syntactic analysis carrier for ANA-12 and ANA-13; its
+   point_model equals var_point_uses of that carrier. The separately proved semantic variable
+   view has pending slots and different uses and defs, although both views share a graph.
+   Source-variable liveness at raw points transfers only by ssa_refined_liveness. Semantic
+   conclusions use the original semantic variable-view laws; intermediate facts and sets over
+   the different variable carriers are not identified. *)
 Definition solve_values {S O N E V K C A} (pr : sparse_problem S O N E V K C A)
     (EN : encoding N) (EE : encoding E) (EV : encoding V)
     (HL : lattice_laws (lift_bot_lattice (fact_lat (domain pr))))

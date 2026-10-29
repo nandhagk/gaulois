@@ -555,6 +555,9 @@ Definition sop_encoding : encoding sop.
 Definition expr_encoding : encoding expr.            (* While's expressions *)
 Definition const_numeric : numeric_domain (tagged (flat Z)) := tagged_domain const_domain.
 Definition const_conc : concretisation (tagged (flat Z)) word := tagged_gamma const_gamma.
+(* This constant-only client retains const_gamma and tagged_gamma. Product clients use DOM-4's
+   word-restricted meaning, which agrees pointwise with the former tagged intersection meaning by
+   product_tagged_gamma_equiv. *)
 (* liveness_at P pt: the fact at the point pt of solve_liveness on ssa_var_view (fun _ _ => None) P 0;
    while_live_at prog n: the same for while_var_view prog word_stores at the skeleton point n;
    while_needed prog: needed_values var_encoding (while_demand_view prog word_stores);
@@ -1300,3 +1303,236 @@ local step and effect laws, with unknown effects handled conservatively.
    `event`, `sop`, `cval`, `OExt`, `VF32`, `VF64`, `activation`, `activation_endings`,
    `ssa_block_view`, `ssa_demand_view`, `ssa_edge`, `values_of`, `wf_program`, `var_encoding`) are
    unchanged in meaning, and each takes `ext` first.
+## Refined Ssa point graph and activation (EX-5a)
+
+```coq
+(* ExamplesSsaActivation.v; each constructor has its own finite encoding. *)
+Inductive ssa_refined_value : Type :=
+| SsaSourceValue (x : vid)
+| SsaCallResult (l : label).
+
+Inductive ssa_refined_point : Type :=
+| SsaBeforeParams (l : label)
+| SsaExecPoint (l : label) (pc : nat)
+| SsaCallReady (l : label)
+| SsaAfterReturn (l : label)
+| SsaDeadPoint (l : label).
+
+Inductive ssa_refined_edge : Type :=
+| SsaBindParams (l : label)
+| SsaInstruction (l : label) (pc : nat)
+| SsaMakeCallResult (l : label)
+| SsaTransfer (src dst : label) (slot : nat)
+| SsaReturn (l : label).
+
+Definition ssa_refined_value_encoding : encoding ssa_refined_value.
+Definition ssa_refined_point_encoding : encoding ssa_refined_point.
+Definition ssa_refined_edge_encoding : encoding ssa_refined_edge.
+
+(* ExamplesSsaViews.v imports ExamplesSsaActivation.v. *)
+(* This is an analysis carrier. It is not a semantic view of activation. *)
+Definition ssa_refined_var_view (P : program) (f : func) :
+  var_view ssa_refined_point event ssa_refined_point ssa_refined_edge
+    ssa_refined_value unit.
+Definition ssa_refined_points (P : program) (f : func) :
+  ssa_points label ssa_edge ssa_refined_point ssa_refined_edge ssa_refined_value.
+Definition ssa_refine_point (P : program) (f : func) (n : label * nat) :
+  ssa_refined_point.
+
+Theorem ssa_refined_point_model (P : program) (f : func) :
+  point_model (ssa_refined_points P f) = var_point_uses (ssa_refined_var_view P f).
+
+Theorem ssa_refined_point_laws (ext : nat -> list cval -> option cval)
+    (P : program) (f : func) :
+  wf_program ext P -> In f (map fst (funcs P)) ->
+  ssa_point_laws (ssa_refined_points P f).
+
+Theorem ssa_refined_liveness (ext : nat -> list cval -> option cval)
+    (P : program) (f : func) :
+  wf_program ext P -> In f (map fst (funcs P)) ->
+  forall n x, In n (Graph.nodes (cfg (ssa_point_view ext P f))) ->
+  (syntactic_live (var_point_uses (ssa_var_view ext P f)) x n <->
+   syntactic_live (point_model (ssa_refined_points P f)) (SsaSourceValue x)
+     (ssa_refine_point P f n)).
+```
+
+Build one shared `point_uses` expression and use it both for the point model and the analysis
+carrier, so the record equality is constructive, with no functional extensionality. The carrier
+has `point := fun n => n`, `taken` and `stays` constantly false and `vget` constantly `tt`.
+It exists to instantiate syntactic ANA-1, ANA-11, ANA-12 and ANA-13 statements; no
+`var_view_laws` or semantic soundness is claimed for it. Keep the existing raw semantic variable
+view and its actual `var_view_laws`. This distinction is necessary: at a join, two reachable
+states can have the same source variables but different selected incoming pending lists; a
+deterministic parameter edge can therefore write different values despite equality of its
+syntactic use list. Neither inventing hidden equality nor adding a non-dominating phi input as a
+use establishes `uses_determine`.
+
+The refined block graph is exactly `cfg (base (ssa_block_view ext P f))`; graph construction
+does not depend on `ext`. Include all original blocks, even unreachable ones. The graph entry
+is `SsaBeforeParams` of the function entry. Within each block place `SsaBeforeParams l`, then
+`SsaExecPoint l 0` through the terminator point, with the return endpoint after a return and a
+`SsaCallReady l` after a call. The first internal edge `SsaBindParams l` defines exactly
+`map SsaSourceValue` of the block parameters and has no syntactic uses. Entry arguments are
+external concrete initial values, not SSA variables or invented uses; the first parameter edge
+defines them before the first instruction reads them. Every ordinary instruction edge reads and
+defines the injected source variables in the original syntax; retain original operand order and
+duplicates. Return and trap exit uses match the raw view.
+
+Each jump, branch or switch `SsaTransfer src dst slot` preserves its corresponding
+`SsaEdge src dst slot` block-edge occurrence, including
+parallel slots, reads its actual selected arguments and guard operands before any target
+parameter definition, and defines no source value. Its `block_edge_args` is the injected
+selected argument list in the original order. A call's internal `SsaMakeCallResult l` reads the
+call operands and defines only `SsaCallResult l`; its following `SsaTransfer` reads that value,
+and its block edge has `block_edge_args = [SsaCallResult l]`. The continuation parameter is
+defined on its common parameter edge. Thus the refined arity is one without asserting equality
+with the old empty call `edge_args`. Distinct constructors give a fresh value per call site and
+prevent aliasing source values. Empty parameter edges remain present; no source block or entry
+restriction is added.
+
+The point definition of a parameter is `SsaBeforeParams` of its block, of an instruction result
+the source of its instruction edge, and of a call result `SsaExecPoint l` at its terminator;
+unmentioned values have `None`. Define the function from one prepared definition index, not by
+scanning definitions at each query. `ssa_refine_point` maps a raw `(l, pc)` to
+`SsaExecPoint l pc` up to the terminator and maps a raw return endpoint to `SsaAfterReturn l`.
+The raw graph also lists a one-past-terminator node for non-returning terminators; these are
+isolated dead endpoints, mapped to `SsaDeadPoint l`, which is not in the refined graph and has
+empty outgoing and exit-use lists. This does not discard an unreachable source block. State the
+mapping for all raw graph nodes, including unreachable components. The liveness theorem
+is an equivalence for injected source variables at these stable points, not an equation between
+sets over different carriers and not a claim about intermediate points. Prove it by mapping
+finite use-before-kill paths in both directions. At a raw call edge the new temporary is defined
+and used strictly between stable points; it cannot become a source-variable use or kill.
+
+### Refined activation correspondence
+
+```coq
+(* ExamplesSsaActivation.v owns state, activation and macro definitions. ExamplesSsaViews.v
+   imports it and owns both variable views and their graph agreement. *)
+Record ssa_refined_state : Type := SsaRefinedState {
+  srs_point : ssa_refined_point;
+  srs_env : vid -> option cval;
+  srs_call_results : label -> option cval;
+  srs_pending : nat -> option cval
+}.
+Inductive ssa_refined_semantic_var : Type :=
+| SsaSourceVar (x : vid)
+| SsaCallVar (l : label)
+| SsaPendingVar (i : nat).
+Definition ssa_refined_semantic_var_encoding : encoding ssa_refined_semantic_var.
+Definition ssa_refined_activation (ext : nat -> list cval -> option cval)
+    (P : program) (f : func) : semantics ssa_refined_state event.
+Definition ssa_refined_endings (ext : nat -> list cval -> option cval)
+    (P : program) (f : func) : endings ssa_refined_state.
+(* ExamplesSsaViews.v owns this view, graph agreement and semantic view laws. *)
+Definition ssa_refined_semantic_var_view (ext : nat -> list cval -> option cval)
+    (P : program) (f : func) :
+  var_view ssa_refined_state event ssa_refined_point ssa_refined_edge
+    ssa_refined_semantic_var (option cval).
+Theorem ssa_refined_graph_agrees (ext : nat -> list cval -> option cval)
+    (P : program) (f : func) :
+  cfg (gview (ssa_refined_semantic_var_view ext P f)) =
+    live_graph (point_model (ssa_refined_points P f)).
+(* ExamplesSsaActivation.v owns the stable relation and macro correspondence. *)
+Definition ssa_refined_stable (r : ssa_refined_state) : Prop.
+Definition ssa_refined_rel (P : program) (f : func) (a : astate)
+    (r : ssa_refined_state) : Prop.
+
+(* ExamplesSsaViews.v. *)
+Theorem ssa_refined_semantic_var_laws (ext : nat -> list cval -> option cval)
+    (P : program) (f : func) :
+  wf_program ext P -> In f (map fst (funcs P)) ->
+  var_view_laws (ssa_refined_activation ext P f) (ssa_refined_endings ext P f)
+    (ssa_refined_semantic_var_view ext P f).
+
+(* ExamplesSsaActivation.v. A macro has one or more steps with no stable intermediate state. *)
+Inductive ssa_refined_macro (m : semantics ssa_refined_state event) :
+    ssa_refined_state -> list event -> ssa_refined_state -> Prop :=
+| SsaMacroLast : forall r tr t,
+    step m r tr t -> ssa_refined_stable t -> ssa_refined_macro m r tr t
+| SsaMacroMore : forall r tr1 u tr2 t,
+    step m r tr1 u -> ~ ssa_refined_stable u -> ssa_refined_macro m u tr2 t ->
+    ssa_refined_macro m r (tr1 ++ tr2) t.
+
+Theorem ssa_refined_initial (ext : nat -> list cval -> option cval)
+    (P : program) (f : func) :
+  wf_program ext P -> In f (map fst (funcs P)) ->
+  (forall a, initial (activation ext P f) a ->
+    exists r r', initial (ssa_refined_activation ext P f) r /\
+      exec (ssa_refined_activation ext P f) r [] r' /\ ssa_refined_rel P f a r') /\
+  (forall r, initial (ssa_refined_activation ext P f) r ->
+    exists a r', initial (activation ext P f) a /\
+      exec (ssa_refined_activation ext P f) r [] r' /\ ssa_refined_rel P f a r').
+
+Theorem ssa_refined_step_correspondence (ext : nat -> list cval -> option cval)
+    (P : program) (f : func) :
+  wf_program ext P -> In f (map fst (funcs P)) ->
+  forall a r, reachable_state (activation ext P f) a ->
+    reachable_state (ssa_refined_activation ext P f) r -> ssa_refined_rel P f a r ->
+    (forall tr a', step (activation ext P f) a tr a' ->
+      exists r', ssa_refined_macro (ssa_refined_activation ext P f) r tr r' /\
+        ssa_refined_rel P f a' r') /\
+    (forall tr r', ssa_refined_macro (ssa_refined_activation ext P f) r tr r' ->
+      exists a', step (activation ext P f) a tr a' /\ ssa_refined_rel P f a' r').
+
+Theorem ssa_refined_behaviour (ext : nat -> list cval -> option cval)
+    (P : program) (f : func) :
+  wf_program ext P -> In f (map fst (funcs P)) ->
+  forall a r, reachable_state (activation ext P f) a ->
+    reachable_state (ssa_refined_activation ext P f) r -> ssa_refined_rel P f a r ->
+  same_behaviour (activation ext P f) (activation_endings ext P f) a
+    (ssa_refined_activation ext P f) (ssa_refined_endings ext P f) r.
+```
+
+The refined initial state is before entry binding and stores exactly the arbitrary valid typed
+entry arguments in pending slots 0 through arity minus one. A transfer evaluates the chosen
+argument list in the old environment once and writes these slots simultaneously;
+`SsaBindParams` reads them and performs one parallel bind. Never evaluate sequentially in the
+updated environment. Slots persist after binding; an edge overwrites exactly the slots for its
+target arity and leaves every other slot unchanged. Slots beyond the largest block-parameter arity
+are never used or defined. Initial unused slots and call-result slots are `None`. On calls, evaluate
+operands and choose the same arbitrary typed result as activation on `SsaMakeCallResult`, then
+pass the stored result on the projected edge. Preserve the original event on the corresponding
+macro, with all administrative steps silent. The point relation identifies stable execution or
+return points with raw `(alabel, apc)` and requires pointwise equality of source environments;
+it does not require equality of ghost call-result slots. Endings at stable points agree, including
+traps, final, stop and stuck; intermediate states cannot be endings or stuck. Prove a fixed bound
+of at most two consecutive administrative steps, including initial binding, so no infinite silent
+administrative run is introduced. `same_behaviour` covers finite event prefixes, all four ending
+tags and diverging prefixes. No entry-result or incoming-argument choice is left uncorrelated.
+In particular, when a call emits an event before its administrative continuation edges, the
+reverse finite-prefix direction matches that intermediate prefix by the raw call step.
+
+The semantic variable view uses the same actual refined graph and classifies each step by its
+edge. Its `vget` returns `srs_env r x` for `SsaSourceVar x`, `srs_call_results r l` for
+`SsaCallVar l`, and `srs_pending r i` for `SsaPendingVar i`, including unused slots. For every
+transfer into arity `k`, its defs are precisely `SsaPendingVar 0` through `k-1`, and its uses
+are the selected source arguments and guards, or the call-result slot for a call continuation.
+The parameter edge uses those `k` pending variables and defines the `k` source parameters. The
+call-result edge defines its `SsaCallVar`; other instruction uses, definitions and exit uses
+are the source variables read or written by the actual operation. Include guard, trap, return
+and indirect-call operands. Event and edge selection is determined by the listed uses; for
+arbitrary loads, allocations and call results, choose the same result as the witnessed step.
+Prove `defs_frame`, same-label `uses_determine` and `exits_determine` by cases, including the
+zero-arity and unused-slot cases. This semantic view has a different variable universe and
+different edge uses/defs from the strict syntactic point model: pending slots can be defined on
+several incoming edges, and are not strict SSA values. It supports semantic dense analyses via
+its own laws. It is not the argument to `ssa_live_query_dense`; the exact source-variable bridge
+above connects the latter to the original semantic view. No equality of the two variable-view
+records or liveness sets is asserted.
+
+### Refined reachable strictness (EX-5c)
+
+```coq
+Theorem ssa_refined_reachable_strict (ext : nat -> list cval -> option cval)
+    (P : program) (f : func) :
+  wf_program ext P -> In f (map fst (funcs P)) ->
+  reachable_point_ssa (ssa_refined_points P f).
+```
+
+Prove strict point dominance from the actual EX-2 availability certificate and unique source
+definitions. Include entry parameter use at the first instruction, same-block instruction order,
+phi reads at the predecessor's projected edge, self-loops, parallel edges and the call-result
+definition before its use. The proof applies to reachable points only and does not assume every
+block is reachable or the entry has no incoming edges. Preserve the existing block-view origin
+and strictness proofs and activation lifting.

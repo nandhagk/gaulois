@@ -30,7 +30,7 @@ A build can warn about dependency theories that do not yet contain a `.v` file a
 
 Landed cards report their own focused builds and checks; they do not substitute for the planned
 fresh FINAL build. Run tests appropriate to each card and follow `run/RUNBOOK.md` for reviews,
-claims audits and landing. The examples layout checker needs a tooling repair before the affected
-example cards can land; the run ledger records its current status.
+claims audits and landing. The examples layout checker repair has landed; individual example
+cards still require their own verification and review.
 Focused measurements may use the planned harness for a specific unresolved choice; benchmarks are
 not a completion gate.

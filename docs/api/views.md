@@ -1796,6 +1796,10 @@ parallel edges. A client's later common intra-block parameter-definition edge wr
 parameters; thus all incoming phi operands are read before the common static definition. The
 client additionally proves its point edges' uses and definitions agree with its instruction
 syntax and semantics; these are client-specific obligations rather than generic SSA laws.
+The block edge and value identities belong to this point model. A client may use an expanded
+graph and fresh values for results supplied by calls; it must state any correspondence to its
+original graph and semantics explicitly. A purely syntactic point model alone does not prove
+the semantic variable-view laws, especially when parameter values are held in pending state.
 Exit uses include final, trap and stop operands. Unreachable nodes still have syntactic liveness;
 the strict record only restricts the reachable part. Definitions on a dynamic loop can execute
 more than once. An entry value is represented by a definition edge before its uses.

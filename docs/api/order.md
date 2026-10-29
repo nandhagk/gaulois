@@ -267,6 +267,12 @@ Definition product_agree {A B C} (RA : agreement A C) (RB : agreement B C) : agr
 made after reducing the left operand, `join` reduces its result, `widen` does not reduce (reducing
 after widening can break termination), and `narrow` reduces its second argument.
 
+`reduction_sound` is relative to the supplied concretisations and quantifies over their entire
+concrete carrier. A client may supply a restricted meaning explicitly. Domains supplies
+word-restricted meanings at a fixed width for its reductions; the raw Order product and component
+meanings stay unchanged. `reduction_laws` still requires monotonicity and idempotence up to the
+component preorder, independently of semantic soundness.
+
 ```coq
 Record reduction_laws {A B} (LA : lattice A) (LB : lattice B) (reduce : A * B -> A * B) : Prop := {
   reduce_lower : forall x, leb (product_lattice LA LB) (reduce x) x = true;      (* only goes down *)

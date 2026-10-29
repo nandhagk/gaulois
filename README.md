@@ -32,13 +32,14 @@ contracts are in [docs/api](docs/api/), with a [name index](docs/api/names.md). 
 
 ## Status
 
-At 2026-10-28 23:41 UTC, the landed foundations include Collections, Order and Bits, numeric and
-interval domain components, and the source and claims checking tool. Graph includes reachability,
-two dominance producers, SCCs, loops and colouring components. Fixpoint includes checking and
-fuel-bounded and total worklist solvers. Rewrite includes sorted syntax, e-graph rebuilding and
-pattern matching and client-defined class analyses. Rules syntax and basic semantic views are also
-present. Landed cards report kernel-checked claims and computed examples for their assigned
-contracts; they do not establish the whole library. Most analyses, later views and clients remain
-planned. The run ledger records
-the changing card status; see [catalogue](docs/catalogue.md) for scope and [trust](docs/trust.md)
+At commit `b3e8d41` on 2026-10-29, the landed foundations include Collections, Order and Bits,
+numeric, wrapping interval and memory domain components, and the source and claims checking tool.
+Graph includes reachability, two dominance producers, SCCs, loops, WTO and colouring components.
+Fixpoint includes checking, worklist, local and nested WTO solvers. Rewrite includes sorted syntax,
+e-graph rebuilding, pattern matching, class analyses, bounded saturation and finite witness
+extraction. Rules includes stratified solving and indexed joins; basic semantic views and the Ssa
+toy language are also present. Landed cards report kernel-checked claims and computed examples
+for their assigned contracts; they do not establish the whole library. Most analyses, later views
+and clients remain planned. The run ledger records the changing card status; see
+[catalogue](docs/catalogue.md) for scope and [trust](docs/trust.md)
 for the evidence. Contracts not yet implemented are specifications, not compiled interfaces.

@@ -76,7 +76,8 @@ Order record. Stdlib imports (`ZArith`, `List`, `Bool`, `Sorting.Sorted`) are im
 | `DomainsSymbolic.v` | symbolic hash-consed keys over `Table` | DOM-7 |
 
 Prerequisites. DOM-1a needs ORD-1 and BIT-1; DOM-1b needs DOM-1a; DOM-2 and DOM-3 need DOM-1a and
-BIT-2; DOM-4 needs DOM-2, DOM-3 and DOM-1b (`interval_cong_domain`); DOM-5 needs ORD-1 and BIT-2;
+BIT-2; the landed DOM-3 also reuses DOM-1b interval definitions and soundness lemmas. DOM-4 needs
+DOM-2, DOM-3 and DOM-1b (`interval_cong_domain`); DOM-5 needs ORD-1 and BIT-2;
 DOM-6
 needs ORD-2 and DOM-1b (an address holds an `interval`); DOM-7 needs ORD-1, COL-2 and BIT-1.
 
@@ -447,7 +448,9 @@ Definition cong_domain : word_domain cong.
 
 ### Reduced products (`DomainsProduct.v`, DOM-4)
 
-One functor builds every product; a reduction supplies the extra precision.
+One functor builds every product; a reduction supplies the extra precision. Product meanings are
+explicitly restricted to words at the supplied width. This restriction is local to products:
+`payload_concretisation`, `const_gamma` and the other component meanings remain unchanged.
 
 ```coq
 Definition product_word_domain {P Q} (D1 : word_domain P) (D2 : word_domain Q)
@@ -457,9 +460,12 @@ Definition product_word_domain {P Q} (D1 : word_domain P) (D2 : word_domain Q)
    passume: both refinements, each refined operand reduced at its width;
    pmeet w a b = reduce w (pmeet D1 w (fst a) (fst b), pmeet D2 w (snd a) (snd b)) *)
 Definition product_pgamma {P Q} (G1 : width -> P -> Z -> Prop) (G2 : width -> Q -> Z -> Prop) :
-  width -> P * Q -> Z -> Prop := fun w pq z => G1 w (fst pq) z /\ G2 w (snd pq) z.
+  width -> P * Q -> Z -> Prop :=
+  fun w pq z => is_word w z /\ G1 w (fst pq) z /\ G2 w (snd pq) z.
 Definition payload_concretisation {P} (G : width -> P -> Z -> Prop) (w : width) : concretisation P Z :=
   {| gamma := G w |}.
+Definition word_payload_concretisation {P} (G : width -> P -> Z -> Prop) (w : width) :
+  concretisation P Z := {| gamma := fun p z => is_word w z /\ G w p z |}.
 
 (* Every reduction sends a pair with an empty component, one whose leb to its bottom holds, to the
    bottom pair; reduction_empty states it. *)
@@ -467,18 +473,45 @@ Definition reduction_empty {P Q} (LP : lattice P) (LQ : lattice Q) (reduce : P *
   forall p q, leb LP p (bot LP) = true \/ leb LQ q (bot LQ) = true -> reduce (p, q) = (bot LP, bot LQ).
 
 Definition reduce_bits_wrapped (w : width) : tnum * wrapped -> tnum * wrapped.
-(* an empty component gives the bottom pair; otherwise round the arc's end points to the nearest
-   values consistent with the known bits (wrap-around included), the bottom pair if none is; then,
-   if the arc does not wrap, make its common leading bits known; two rounds *)
+(* Normalize the arc first. A component <= bottom or contradictory known bits gives the bottom pair.
+   With WFull, keep the pair unchanged after those checks. With a proper arc, round its end points
+   to the nearest values consistent with the known bits in its circular order, returning the bottom
+   pair if none exists; then, if the arc does not wrap, make its common leading bits known. Do two
+   rounds. Keeping WFull avoids choosing between incomparable arcs when there is no least arc
+   containing all the allowed words; it is required for monotonicity with these proper-arc rounds. *)
 Definition reduce_interval_cong (w : width) : interval * cong -> interval * cong.
 (* an empty component gives the bottom pair; otherwise round lo up and hi down to values congruent to
    r modulo m (Granger 1989); crossing end points give the bottom pair; equal end points make the
    congruence exact and the interval a point *)
 Definition reduce_const_with {Q} (D : word_domain Q) (exact : width -> Q -> option Z) (w : width) :
   flat Z * Q -> flat Z * Q.
-(* an empty component (FBot, or a payload <= bot) gives the bottom pair; a known constant meets the
-   other payload with pconst; a payload with exact = Some c makes the constant FVal c, and a payload
-   with exact = Some c' against a constant FVal c with c <> c' gives the bottom pair *)
+(* Let B = (FBot, bot (plat D w)) and f c q = pmeet D w q (pconst D w c).
+   First return B for FBot or q <= bot. For FVal c, return B if c is not a word; otherwise
+   compute q' = f c q, return B if q' <= bot, and return (FVal c, q') otherwise.
+   For FTop, query exact w q: None returns (FTop, q); Some c returns (FVal c, q) if c is a word,
+   and B otherwise. Test is_word using decidable integer bounds. In the FVal branch do not query
+   exact: the mismatch law below makes an exact conflicting payload reduce to B via the meet. *)
+
+(* These are additional caller obligations, not laws of all word domains. All comparisons use the
+   payload's preorder; they do not assert that pmeet is a greatest lower bound. *)
+Record const_reduction_laws {Q} (D : word_domain Q) (G : width -> Q -> Z -> Prop)
+  (exact : width -> Q -> option Z) : Prop := {
+  const_exact_sound : forall w q c z, exact w q = Some c -> is_word w z -> G w q z -> z = c;
+  const_exact_monotone : forall w q1 q2 c, leb (plat D w) q1 q2 = true ->
+    exact w q2 = Some c ->
+    leb (plat D w) q1 (bot (plat D w)) = true \/ exact w q1 = Some c;
+  const_meet_monotone : forall w c q1 q2, is_word w c ->
+    leb (plat D w) q1 q2 = true ->
+    leb (plat D w) (pmeet D w q1 (pconst D w c))
+      (pmeet D w q2 (pconst D w c)) = true;
+  const_meet_idempotent : forall w c q, is_word w c ->
+    leb (plat D w) (pmeet D w q (pconst D w c))
+      (pmeet D w (pmeet D w q (pconst D w c)) (pconst D w c)) = true;
+  const_meet_exact_fixed : forall w c q, is_word w c -> exact w q = Some c ->
+    leb (plat D w) q (pmeet D w q (pconst D w c)) = true;
+  const_meet_mismatch : forall w c q d, is_word w c -> exact w q = Some d -> c <> d ->
+    leb (plat D w) (pmeet D w q (pconst D w c)) (bot (plat D w)) = true
+}.
 
 Definition bits_wrapped_domain : word_domain (tnum * wrapped).
 Definition interval_cong_domain (thresholds : list Z) : word_domain (interval * cong).
@@ -619,8 +652,9 @@ Definition site_ranges {T} (ET : encoding T) (F : list (footprint T)) (t : T) : 
 Definition footprints_normalise {T} (ET : encoding T) (F : list (footprint T)) : list (footprint T).
 Definition footprints_inter {T} (ET : encoding T) (F G : list (footprint T)) : list (footprint T).
 Definition footprints_diff {T} (ET : encoding T) (F G : list (footprint T)) : list (footprint T).
-(* each normalises its arguments, then works per site with ranges_add, ranges_inter and ranges_diff
-   over the byte_ranges of the site; the results are canonical *)
+(* Preparation buckets ranges by site, then filters, sorts and coalesces each bucket once, with a
+   separate sort of occupied site codes. Inter and diff combine the prepared indexes using the public
+   byte_ranges operations; the results are canonical. *)
 
 (* The must-facts of written bytes. The reached carrier contains only canonical lists. *)
 Definition canonical_footprints {T} (ET : encoding T) : Type :=
@@ -797,7 +831,8 @@ Theorem wrapped_laws : lattice_laws (wrapped_lattice w).
 Theorem wrapped_join_minimal : forall a b c : wrapped,
   leb (wrapped_lattice w) a c = true -> leb (wrapped_lattice w) b c = true ->
   wrapped_size w (join (wrapped_lattice w) a b) <= wrapped_size w c.
-Theorem wrapped_gamma_laws : concretisation_laws (wrapped_lattice w) (wrapped_gamma w).
+Theorem wrapped_gamma_laws : concretisation_laws (wrapped_lattice w)
+  (Concretisation wrapped Z (wrapped_gamma w)).
 Theorem wrapped_word_laws : word_laws wrapped_domain wrapped_gamma.
 (* Proof idea: arcs through off c x = (x - c) mod 2^w; a proper arc c that covers a and b is an
    interval of its own linear order, so one of the two candidate arcs lies inside it
@@ -822,11 +857,20 @@ Context {P Q : Type} (D1 : word_domain P) (D2 : word_domain Q) (G1 : width -> P 
 (** A product of two sound payload domains with a sound, monotone, idempotent reduction is sound. *)
 Theorem product_word_laws : word_laws D1 G1 -> word_laws D2 G2 ->
   (forall w, reduction_laws (plat D1 w) (plat D2 w) (reduce w)) ->
-  (forall w, reduction_sound (payload_concretisation G1 w) (payload_concretisation G2 w) (reduce w)) ->
+  (forall w, reduction_sound (word_payload_concretisation G1 w)
+    (word_payload_concretisation G2 w) (reduce w)) ->
   word_laws (product_word_domain D1 D2 reduce) (product_pgamma G1 G2).
 (* Proof idea: Order's reduced_laws and reduced_gamma_laws per width; each transfer is the pair of
-   transfers followed by reduce, and reduce_gamma keeps the meaning. Card: DOM-4. *)
+   transfers followed by reduce, and reduce_gamma keeps the word meaning. `eval_op_is_word` supplies
+   the forward result's range; input and assumed operand words already have that range. Card: DOM-4. *)
 End ProductWordLaws.
+
+(** Adding the local word restriction does not change any tagged product meaning. *)
+Theorem product_tagged_gamma_equiv : forall {P Q : Type}
+  (G1 : width -> P -> Z -> Prop) (G2 : width -> Q -> Z -> Prop) a v,
+  gamma (tagged_gamma (product_pgamma G1 G2)) a v <->
+  gamma (tagged_gamma (fun w pq z => G1 w (fst pq) z /\ G2 w (snd pq) z)) a v.
+(* `tagged_gamma` already restricts TVal payloads to words; TBot and TAny are unchanged. Card: DOM-4. *)
 
 Section ReductionLaws.
 Context (thresholds : list Z) (w : width).
@@ -835,27 +879,31 @@ Context (thresholds : list Z) (w : width).
     pair with an empty component to the bottom pair. *)
 Theorem reduce_bits_wrapped_laws :
   reduction_laws (tnum_lattice w) (wrapped_lattice w) (reduce_bits_wrapped w) /\
-  reduction_sound (payload_concretisation tnum_gamma w) (payload_concretisation wrapped_gamma w)
+  reduction_sound (word_payload_concretisation tnum_gamma w)
+    (word_payload_concretisation wrapped_gamma w)
     (reduce_bits_wrapped w) /\
   reduction_empty (tnum_lattice w) (wrapped_lattice w) (reduce_bits_wrapped w).
 Theorem reduce_interval_cong_laws :
   reduction_laws (interval_lattice thresholds) (cong_lattice w) (reduce_interval_cong w) /\
-  reduction_sound (payload_concretisation interval_pgamma w) (payload_concretisation cong_gamma w)
+  reduction_sound (word_payload_concretisation interval_pgamma w)
+    (word_payload_concretisation cong_gamma w)
     (reduce_interval_cong w) /\
   reduction_empty (interval_lattice thresholds) (cong_lattice w) (reduce_interval_cong w).
-(* exact must be sound and monotone: below an exact payload, a payload is empty or exact with the
-   same constant. *)
 Theorem reduce_const_with_laws : forall {Q : Type} (D : word_domain Q) (G : width -> Q -> Z -> Prop)
-  (exact : width -> Q -> option Z), word_laws D G ->
-  (forall w' q c, exact w' q = Some c -> forall z, G w' q z -> z = c) ->
-  (forall w' q1 q2 c, leb (plat D w') q1 q2 = true -> exact w' q2 = Some c ->
-    leb (plat D w') q1 (bot (plat D w')) = true \/ exact w' q1 = Some c) ->
+  (exact : width -> Q -> option Z), word_laws D G -> const_reduction_laws D G exact ->
   reduction_laws (flat_lattice Z.eqb) (plat D w) (reduce_const_with D exact w) /\
-  reduction_sound (payload_concretisation const_gamma w) (payload_concretisation G w)
+  reduction_sound (word_payload_concretisation const_gamma w) (word_payload_concretisation G w)
     (reduce_const_with D exact w) /\
   reduction_empty (flat_lattice Z.eqb) (plat D w) (reduce_const_with D exact w).
-(* Proof idea: the least and greatest consistent end points are monotone in the facts; a second
-   application changes nothing because the first already made the facts consistent. Card: DOM-4. *)
+(* Proof idea: for proper wrapped arcs use the upper arc's circular linear order: every contained
+   proper arc is a subinterval, and intersecting with more known bits only moves selected endpoints
+   inward. If the upper rounded arc is nonwrapping, a contained nonempty arc is nonwrapping too,
+   so its leading-bit refinement includes the upper one's. Full arcs and contradictions are separate
+   cases. Prove one-round monotonicity and that two rounds are stable, including raw masks and arc
+   representations. For intervals, the least and greatest consistent endpoints are monotone.
+   For constants use the separate meet and exact-query laws, including noncanonical and empty
+   payloads. A second application is equivalent in the preorder; soundness keeps every shared word.
+   Card: DOM-4. *)
 End ReductionLaws.
 
 (** The three named products are sound numeric domains. *)

@@ -4,10 +4,11 @@ The catalogue describes the intended scope, including work not yet implemented. 
 `api/` specify definitions and claims; cards assign implementation and verification work. A
 catalogue entry may compose several shared domains, views, solvers and checkers.
 
-At 2026-10-28 23:41 UTC, landed work covers foundations, parts of Graph and Fixpoint, sorted
-Rewrite syntax, e-graph rebuilding, pattern matching and class analyses, Rules syntax, and basic
-views. Individual landed cards report checked claims and examples; the remaining entries and
-compositions are not implied to be complete. The run ledger is the current card-by-card status.
+At commit `b3e8d41` on 2026-10-29, landed work covers foundations, parts of Graph and Fixpoint,
+the generic Rewrite core through witness extraction, stratified Rules solving and indexed joins,
+basic views, and parts of the numeric and memory domains. Individual landed cards report checked
+claims and examples; the remaining entries and compositions are not implied to be complete. The
+run ledger is the current card-by-card status.
 
 - **Graph:** reachability, RPO, merge nodes, selectable LT and Semi-NCA dominators and
   post-dominators, frontiers, control dependence, SCCs, loops, WTO, reducibility, forwarding

@@ -5,7 +5,8 @@ proved theorem whose assumptions meet the policy below. A statement that compile
 it does not establish a proof. A smoke check reports an outcome on examples. An experiment reports
 measurements and does not prove a general complexity or soundness claim.
 
-At 2026-10-28 23:41 UTC, landed card reports and independent reviews record focused builds,
+At commit `b3e8d41` on 2026-10-29, landed card reports and independent reviews record focused
+builds,
 examples and assumption audits for their assigned claims. This is evidence under their stated
 premises, not a proof of unimplemented contracts. The API documents themselves are specifications
 and have not been compiled as a whole. The run ledger tracks landed and pending cards; FINAL is

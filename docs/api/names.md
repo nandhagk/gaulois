@@ -995,6 +995,19 @@ Contract: [Examples](examples.md).
 - `AState` — constructor; builds an activation state.
 - `alabel`, `apc`, `aenv` — fields; select activation location and values.
 - `activation`, `activation_endings` — Definitions; activation semantics and endings.
+- `ssa_refined_value`, `SsaSourceValue`, `SsaCallResult`, `ssa_refined_point`,
+  `SsaBeforeParams`, `SsaExecPoint`, `SsaCallReady`, `SsaAfterReturn`, `SsaDeadPoint`,
+  `ssa_refined_edge`, `SsaBindParams`, `SsaInstruction`, `SsaMakeCallResult`, `SsaTransfer`,
+  `SsaReturn` — Types and constructors; refined instruction-point graph.
+- `ssa_refined_value_encoding`, `ssa_refined_point_encoding`, `ssa_refined_edge_encoding`,
+  `ssa_refined_semantic_var_encoding` — Definitions; finite encodings.
+- `ssa_refined_state`, `SsaRefinedState`, `srs_point`, `srs_env`, `srs_call_results`,
+  `srs_pending`, `ssa_refined_semantic_var`, `SsaSourceVar`, `SsaCallVar`, `SsaPendingVar` —
+  Types, constructors and fields; refined state and semantic variables.
+- `ssa_refined_activation`, `ssa_refined_endings`, `ssa_refined_stable`, `ssa_refined_rel`,
+  `ssa_refined_macro`, `SsaMacroLast`, `SsaMacroMore` — Definitions and constructors.
+- `ssa_refined_initial`, `ssa_refined_step_correspondence`, `ssa_refined_behaviour` — Theorems;
+  execution correspondence.
 
 ### `ExamplesSsaBridge.v` — EX-5a
 
@@ -1007,6 +1020,12 @@ Contract: [Examples](examples.md).
 - `SsaEdge` — constructor; builds an Ssa edge.
 - `esrc`, `edst`, `eslot` — fields; select edge source, target and slot.
 - `values_of`, `ssa_block_view`, `ssa_point_view` — Definitions; values and graph adapters.
+- `ssa_refined_var_view`, `ssa_refined_points`, `ssa_refine_point`,
+  `ssa_refined_semantic_var_view` — Definitions; refined models and analysis carriers (EX-5a).
+- `ssa_refined_point_model`, `ssa_refined_point_laws`, `ssa_refined_liveness` — Theorems;
+  model agreement, point laws and source-variable liveness correspondence (EX-5a).
+- `ssa_refined_graph_agrees`, `ssa_refined_semantic_var_laws` — Theorems; semantic view laws and
+  graph agreement (EX-5a).
 - `instr_or_term` — Inductive; instruction or terminator.
 - `AnInstr`, `ATerm` — constructors; embed an instruction or terminator.
 - `call_site`, `ssa_effects`, `ssa_var_view`, `ssa_demand_view` — Definitions; call sites and
@@ -1021,6 +1040,7 @@ Contract: [Examples](examples.md).
 - `subtrace` — Inductive; subsequence relation on traces.
 - `sub_nil`, `sub_keep`, `sub_skip` — constructors; empty, retained and skipped trace events.
 - `ssa_strict_laws`, `activation_lifting` — Theorems; strict SSA and activation trace lifting.
+- `ssa_refined_reachable_strict` — Theorem; reachable strict SSA for the refined model.
 
 ### `ExamplesSsaEffects.v` — EX-5b
 
@@ -1822,12 +1842,18 @@ Contract: [Examples](examples.md).
 ### `DomainsProduct.v` — DOM-4
 
 - `product_word_domain` — Definition; Build a reduced product of payload domains.
-- `product_pgamma` — Definition; Intersect the meanings of two payloads.
+- `product_pgamma` — Definition; Intersect the meanings of two payloads on words.
 - `payload_concretisation` — Definition; Expose a payload meaning as a concretisation.
+- `word_payload_concretisation` — Definition; Restrict a payload meaning to words at its width.
+- `product_tagged_gamma_equiv` — Theorem; Tagged product meaning is unchanged by the word restriction.
 - `reduction_empty` — Definition; Require reduction to collapse empty components.
 - `reduce_bits_wrapped` — Definition; Exchange known-bit and circular-interval information.
 - `reduce_interval_cong` — Definition; Exchange interval and congruence information.
 - `reduce_const_with` — Definition; Exchange constant information with a payload.
+- `const_reduction_laws` — Record; Exact-query and meet obligations for constant reduction.
+- `const_exact_sound`, `const_exact_monotone`, `const_meet_monotone`,
+  `const_meet_idempotent`, `const_meet_exact_fixed`, `const_meet_mismatch` — Fields;
+  Constructive obligations for the constant reduction.
 - `bits_wrapped_domain` — Definition; Reduced product of known bits and circular intervals.
 - `interval_cong_domain` — Definition; Reduced product of intervals and congruences.
 - `const_product_domain` — Definition; Reduced product of constants with a payload.
