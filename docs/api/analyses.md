@@ -45,7 +45,7 @@ Conventions, in addition to those of `views.md`:
 | `AnalysesAvailable.v` | gen/kill view, available and very busy expressions, lazy code motion | ANA-1 |
 | `AnalysesStructured.v` | structured liveness, loop certificates, observers | ANA-2 |
 | `AnalysesCensus.v` | region table | ANA-2 |
-| `AnalysesValues.v` | SCCP, known bits, wrapping intervals, reduced products | ANA-3 |
+| `AnalysesValues.v` | operator bridge; numeric value analyses | EX-5a, ANA-3 |
 | `AnalysesPaths.v` | edge predicates, path facts, guard chains | ANA-3 |
 | `AnalysesDemand.v` | demand framework, dead values, demanded bits, observable bits, dead-code erasure | ANA-4 |
 | `AnalysesAdce.v` | aggressive dead code with control dependence | ANA-4 |
@@ -394,6 +394,10 @@ Definition occurrence_census {A G V} (EV : encoding V) (uses : A -> list V)
 ```
 
 ### ANA-3: value analyses (sparse conditional generator of VIEW-4)
+
+EX-5a owns the first two records, `op_bridge` and `op_bridge_laws`, including their
+constructors and fields. ANA-3 extends this same file after EX-5a lands, preserves those
+records and uses them for the remaining declarations.
 
 ```coq
 (* AnalysesValues.v. A numeric domain of Domains, a bridge from the client's operators to

@@ -2241,16 +2241,23 @@ Contract: [Examples](examples.md).
 - `census_atoms`, `occurrence_census` — static syntax traversal and encoded operand counts.
 - `occurrence_census_exact` — Theorem; lookup agrees with the flattened static occurrence count.
 
-### `AnalysesValues.v` — ANA-3
+### `AnalysesValues.v` — EX-5a and ANA-3
+
+EX-5a owns the following bridge records, constructors and fields; ANA-3 uses these same
+declarations after EX-5a lands.
 
 - `op_bridge` — Record; Maps client operators and values to bit-vector expressions and words.
 - `OpBridge` — Constructor; Constructs the op bridge record.
 - `op_expr` — Field; Bit-vector expression for a client operator.
 - `to_word` — Field; Maps a client value to a width and bit-vector word.
 - `op_bridge_laws` — Record; The client operator bridge agrees with word evaluation and truth.
+- `Build_op_bridge_laws` — Constructor; Constructs the operator bridge laws.
 - `bridge_word` — Field; Mapped values satisfy the word-range condition.
 - `bridge_eq` — Field; A defined client result matches the bit-vector evaluation.
 - `bridge_truth` — Field; The client truth predicate agrees with the bit-vector result.
+
+ANA-3 owns the remaining declarations in this file.
+
 - `sparse_of_numeric` — Definition; Adapts a numeric domain to the sparse analysis interface.
 - `numeric_problem` — Definition; Builds a sparse value problem from a numeric domain and bridge.
 - `solve_values` — Definition; Solves a sparse value problem.

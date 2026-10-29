@@ -438,8 +438,10 @@ Definition activation_endings (ext : nat -> list cval -> option cval) (P : progr
 Definition ssa_truth (c : cval) : bool :=
   match c with VInt _ z => negb (Z.eqb z 0) | _ => false end.
 Definition ssa_bridge : op_bridge sop cval.
-(* op_expr: OBin w o by the Bits expression of the width w operation (BDivU is Bits' unsigned
-   division, the trap on zero staying on the toy's side: the bridge speaks only of a Some result),
+(* op_expr: OBin w o by the Bits expression of the width w operation, preserving the toy's shift
+   amount reduction modulo 32 or 64, since Bits shifts by at least the width yield zero (BDivU is
+   Bits' unsigned division, the trap on zero staying on the toy's side: the bridge speaks only of
+   a Some result),
    comparisons as a 1-bit result zero-extended to 32 bits, OZext and OTrunc by extension and
    extract; OConst, OPtrAdd and OExt have none. to_word (VInt w z) = Some (width of w, z) when
    valid_cval (VInt w z), and None for an invalid integer or any other value *)
