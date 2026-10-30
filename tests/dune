@@ -18,4 +18,5 @@
   Gaulois.Domains
   Gaulois.Views
   Gaulois.Analyses
-  Gaulois.Examples))
+  Gaulois.Examples
+  Gaulois.Float))

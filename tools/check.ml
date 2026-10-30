@@ -823,12 +823,14 @@ module Query = struct
   let qualified name = String.concat ~sep:"." [ namespace; name ]
   let closed = "Closed under the global context"
   let axioms = "Axioms:"
+  let classic_axiom = "Stdlib.Logic.Classical_Prop.classic"
 
   let allowed_axioms =
     String.Set.of_list
       [ "Stdlib.Reals.ClassicalDedekindReals.sig_forall_dec"
       ; "Stdlib.Reals.ClassicalDedekindReals.sig_not_dec"
       ; "Stdlib.Logic.FunctionalExtensionality.functional_extensionality_dep"
+      ; classic_axiom
       ]
   ;;
 
@@ -1566,7 +1568,7 @@ let%expect_test "a non Float theorem cannot inherit any axiom" =
     |}]
 ;;
 
-let%expect_test "Float permits only the exact three qualified axiom identities" =
+let%expect_test "Float permits only the exact four qualified axiom identities" =
   Set.iter Query.allowed_axioms ~f:(fun name ->
     let line = [%string "Constant %{name}"] in
     print_s [%sexp (Query.resolve [ line ] : unit Or_error.t)]);
@@ -1580,6 +1582,7 @@ let%expect_test "Float permits only the exact three qualified axiom identities" 
     (Ok ())
     (Ok ())
     (Ok ())
+    (Ok ())
     |}]
 ;;
 
@@ -1588,17 +1591,104 @@ let%expect_test "Float rejects an unexpected kernel reported axiom" =
     Fixture.source
       ~package:Source.float_package
       ~file:"theories/Float/FloatFixture.v"
-      Fixture.classical
+      "From Stdlib.Logic Require Import ProofIrrelevance. Theorem unrelated_claim : forall (P : \
+       Prop) (p q : P), p = q. Proof. exact proof_irrelevance. Qed."
   in
   print_s [%sexp (Claims.source ~repository:Fixture.repository source : unit Or_error.t)];
   [%expect
     {|
     (Error
      (("Float assumptions inspection" (source.file theories/Float/FloatFixture.v)
-       (claims (((name classical_claim) (line 1)))))
+       (claims (((name unrelated_claim) (line 1)))))
       (("Float theorem assumption" (source.file theories/Float/FloatFixture.v)
-        (claim ((name classical_claim) (line 1))))
-       ("unexpected Float axiom" (name Stdlib.Logic.Classical_Prop.classic)))))
+        (claim ((name unrelated_claim) (line 1))))
+       ("unexpected Float axiom"
+        (name Stdlib.Logic.ProofIrrelevance.proof_irrelevance)))))
+    |}]
+;;
+
+let%expect_test "Float claims resolve classic and every prior foundation through the kernel" =
+  List.iter
+    [ Fixture.classical
+    ; "From Stdlib.Reals Require Import ClassicalDedekindReals. Theorem forall_claim : forall (P : \
+       nat -> Prop), (forall n, {P n} + {~ P n}) -> {n | ~ P n} + {forall n, P n}. Proof. exact \
+       sig_forall_dec. Qed."
+    ; "From Stdlib.Reals Require Import ClassicalDedekindReals. Theorem not_claim : forall P : \
+       Prop, {~~ P} + {~ P}. Proof. exact sig_not_dec. Qed."
+    ; "From Stdlib.Logic Require Import FunctionalExtensionality. Theorem ext_claim : forall (A : \
+       Type) (B : A -> Type) (f g : forall x, B x), (forall x, f x = g x) -> f = g. Proof. exact \
+       @functional_extensionality_dep. Qed."
+    ]
+    ~f:(fun text ->
+      let source = Fixture.at ~root:Theories "Float/FloatFixture.v" text in
+      print_s [%sexp (Claims.source ~repository:Fixture.repository source : unit Or_error.t)]);
+  [%expect
+    {|
+    (Ok ())
+    (Ok ())
+    (Ok ())
+    (Ok ())
+    |}]
+;;
+
+let%expect_test "Float axiom resolution rejects ambiguous unrecognized and spoofed identities" =
+  let classic = Query.classic_axiom in
+  let identity = [%string "Constant %{classic}"] in
+  List.iter
+    [ []
+    ; [ identity; identity ]
+    ; [ [%string "Constructor %{classic}"] ]
+    ; [ "Constant Classical_Prop.classic" ]
+    ; [ [%string "Constant Top.%{classic}"] ]
+    ; [ [%string "Constant %{classic}_spoof"] ]
+    ]
+    ~f:(fun lines -> print_s [%sexp (Query.resolve lines : unit Or_error.t)]);
+  [%expect
+    {|
+    (Error ("ambiguous axiom identity" (lines ())))
+    (Error
+     ("ambiguous axiom identity"
+      (lines
+       ("Constant Stdlib.Logic.Classical_Prop.classic"
+        "Constant Stdlib.Logic.Classical_Prop.classic"))))
+    (Error
+     ("unrecognized axiom identity"
+      (line "Constructor Stdlib.Logic.Classical_Prop.classic")))
+    (Error ("unexpected Float axiom" (name Classical_Prop.classic)))
+    (Error
+     ("unexpected Float axiom" (name Top.Stdlib.Logic.Classical_Prop.classic)))
+    (Error
+     ("unexpected Float axiom" (name Stdlib.Logic.Classical_Prop.classic_spoof)))
+    |}]
+;;
+
+let%expect_test "actual non Float paths reject classic including Float tests" =
+  let paths =
+    [ ({ root = Theories; relative = "Collections/CollectionsFixture.v" } : Fixture.Path.t)
+    ; ({ root = Examples; relative = Fixture.while_file } : Fixture.Path.t)
+    ; ({ root = Examples; relative = Fixture.ssa_file } : Fixture.Path.t)
+    ; ({ root = Tests; relative = "Float/FloatTestFixture.v" } : Fixture.Path.t)
+    ]
+  in
+  List.iter paths ~f:(fun ({ root; relative } : Fixture.Path.t) ->
+    let source = Fixture.at ~root relative Fixture.classical in
+    print_s [%sexp (Claims.source ~repository:Fixture.repository source : unit Or_error.t)]);
+  [%expect
+    {|
+    (Error
+     ((file theories/Collections/CollectionsFixture.v) (line 1)
+      (claim (classical_claim))
+      (problem "theorem depends on axioms: Classical_Prop.classic")))
+    (Error
+     ((file examples/While/ExamplesWhileFixture.v) (line 1)
+      (claim (classical_claim))
+      (problem "theorem depends on axioms: Classical_Prop.classic")))
+    (Error
+     ((file examples/Ssa/ExamplesSsaFixture.v) (line 1) (claim (classical_claim))
+      (problem "theorem depends on axioms: Classical_Prop.classic")))
+    (Error
+     ((file tests/Float/FloatTestFixture.v) (line 1) (claim (classical_claim))
+      (problem "theorem depends on axioms: Classical_Prop.classic")))
     |}]
 ;;
 
