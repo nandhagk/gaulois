@@ -57,6 +57,13 @@ qualified name. The original qualified facade API is complete only after EX-7 la
 client card completion covers the listed declarations in their new modules. All names, types,
 semantics and proof obligations below remain unchanged.
 
+### SSA compatibility routing (EX-7)
+
+EX-7 owns the explicit legacy-qualified facade aliases for the landed facade declarations and
+the ANA-5, ANA-7, ANA-8, ANA-10a and ANA-10e client groups indexed in `names.md`. The aliases
+preserve the existing statements, arguments, computational behavior and consumers; this routing
+introduces no new semantic theorem. Computed examples remain in their original test modules.
+
 ## Definitions
 
 ### While (EX-1)
