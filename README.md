@@ -32,14 +32,15 @@ contracts are in [docs/api](docs/api/), with a [name index](docs/api/names.md). 
 
 ## Status
 
-At commit `dce00e5` on 2026-10-30, milestones M2, M3 and M7 are reached. Foundations, Graph,
+At commit `fb9436e` on 2026-10-30, milestones M2, M3, M6 and M7 are reached. Foundations, Graph,
 Fixpoint, domain components, stratified Rules solving and REW-1 through REW-7 with the ANA-6
 facade have landed. Analyses include dense and sparse dataflow, numeric SSA values, SSA liveness
-queries, sparse evaluation graphs, SSA PRE and Andersen points-to. The While and Ssa clients
-exercise landed analyses. Typed extraction and a benchmark harness have landed.
+queries, sparse evaluation graphs, SSA PRE and Andersen points-to. Float provides interval and
+NaN demand domains. The While and Ssa clients exercise landed analyses. Typed extraction and a
+benchmark harness have landed.
 
-At that snapshot, 85 of 100 cards have landed. GVN, calls, memory and remaining clients are
-pending; optional Float is under independent review. Landed cards report checked claims and examples
-for their assigned contracts; they do not establish the whole library. See
+At that snapshot, 86 of 100 cards have landed. GVN, calls, memory and remaining clients are
+pending. Landed cards report checked claims and examples for their assigned contracts; they do not
+establish the whole library. See
 [catalogue](docs/catalogue.md) for scope and [trust](docs/trust.md) for evidence. Contracts not yet
 implemented are specifications, not compiled interfaces.

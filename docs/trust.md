@@ -5,7 +5,7 @@ proved theorem whose assumptions meet the policy below. A statement that compile
 it does not establish a proof. A smoke check reports an outcome on examples. An experiment reports
 measurements and does not prove a general complexity or soundness claim.
 
-At commit `dce00e5` on 2026-10-30, M2, M3 and M7 are reached. Landed reports and reviews
+At commit `fb9436e` on 2026-10-30, M2, M3, M6 and M7 are reached. Landed reports and reviews
 record targeted builds, examples, checks and assumption audits for their assigned claims. EX-4's
 report records 123 closed assumption checks and computed While examples; its review independently
 observed the repository check pass and inspected the worker's build and test evidence. These are
@@ -32,6 +32,23 @@ uses actual complete paths under the stated laws. The three owned files have 4,6
 2,754 lines; fixed ownership overrides the skill's file-size guidance. These checks do not prove
 PRE optimality or extracted runtime correspondence.
 
+FLT-1's accepted review checks all twenty public theorems against their stated contracts and
+independently reruns `just test` and `just check`. The worker reports a targeted build and a
+477-root assumption audit: 295 roots are closed, including all 102 test roots, and the remaining
+182 Float roots use only the four approved identities below. The review inspects that audit; it
+does not rerun it. The 31 computed examples are finite observations, not universal proofs.
+Float's finite enclosure keeps both zero signs when it contains zero. Division uses the full
+ordered hull when a nonzero-containing divisor envelope touches or spans zero; zero-only divisors
+contribute through the exceptional-value table. These are conservative choices, not least-hull
+or exact zero-sign guarantees.
+
+The published Float API already includes the C14 `option cval` demand carriers and the
+`finite_map`, `demand_lattice` and view-argument corrections to `ssa_nan_demand_sound`. C43's
+full exit demands and C53's parameter-input demands are separate semantic rulings. The original
+parameter omission and Flocq trust diagnostics inform those rulings; they do not prove the revised
+laws. The worker reports two earlier memory failures and a test proof repair, followed by passing
+final gates under the original caps. These results do not replace the planned fresh full build.
+
 ## Assumptions
 
 Outside Float, each `Theorem` must be closed under the global context. No new axioms, `Parameter`,
@@ -47,6 +64,8 @@ C13 and C56 permit `Gaulois.Float` theorems to depend only on these exact axioms
 as well as the classical real-number foundations. The owner approves this additional dependency
 under C56. The claims checker must use the same exact list.
 This allowance does not extend to other packages, examples or tests.
+FLT-1's checker controls accept each approved identity for Float and reject an unrelated Float
+axiom, `classic` outside Float, and ambiguous, unrecognized or spoofed identities.
 
 ## Producers and checkers
 
