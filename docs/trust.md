@@ -5,13 +5,49 @@ proved theorem whose assumptions meet the policy below. A statement that compile
 it does not establish a proof. A smoke check reports an outcome on examples. An experiment reports
 measurements and does not prove a general complexity or soundness claim.
 
-At commit `fb9436e` on 2026-10-30, M2, M3, M6 and M7 are reached. Landed reports and reviews
+At commit `1e58e42` on 2026-10-30, M2, M3, M4, M6 and M7 are reached. Landed reports and reviews
 record targeted builds, examples, checks and assumption audits for their assigned claims. EX-4's
 report records 123 closed assumption checks and computed While examples; its review independently
 observed the repository check pass and inspected the worker's build and test evidence. These are
 incremental checks, not a fresh full build. They establish claims under their stated premises, not
 unimplemented contracts. The API documents are specifications and have not been compiled as a
 whole. FINAL is planned to check a fresh full build.
+
+ANA-7's C64 contract retains recurrence algebra, signed and raw observations, exact first
+failure over wrapped values and separate no-wrap evidence. Its supported recognition domain
+includes ranked earlier dependencies and direct doubling; unsupported nonlinear and mutual
+feedback are rejected. The actual count-up client supplies its view laws and theorem applications.
+Tagged word constants support signed observations while ordinary integer constants remain
+mathematical coefficients. The wrapped trip search includes a proved whole-word period and first
+failure; a width-two cycling example returns `None`. Finite examples also cover signed descending
+recognition, no-wrap rejection, ranked dependencies and actual reachable client paths.
+The approved C14 corrections rename the node carrier of `loop_trip_sound` from `N` to `Node`,
+so `(t : N)` is binary natural, and make the `iexpr` and `chrec` constructor carrier arguments
+implicit. These corrections are already in the published API; C64's semantic changes are separate.
+
+The first ANA-7 review found repeated expansion of shared dependencies and requested proof
+factoring. C68 retains prepared indexed dependencies through the producer, checker and compiler,
+with context-validated reuse and exact agreement for valid and malformed public trees. The
+cache keys distinguish complete expression structure; reuse checks rank or the relevant phi
+environment and recomputes when those observations change. Arbitrary external trees may still
+require structural ingestion. The original review's final-value example alone did not establish
+sharing; the accepted implementation exercises the actual integrated path. The accepted full
+review reports both findings resolved, checks both directions for the four plan
+conditions and the compiler translation, and independently reruns the targeted build and check.
+It inspects the worker's full test, formatting and 603 closed-root audit, including 63 public type
+queries. The integrated fixture observes producer reuse and five checker and compiler cache hits,
+including cross-binding reuse; these are finite checked observations, not an asymptotic bound.
+The worker retains 222 original statements and all 52 original examples, and adds seven sharing
+and context examples. The review inspects the final audit and tests rather than rerunning them.
+The review records a scratch working-directory deviation and preserved cache evidence. These
+incremental checks do not replace FINAL or prove source-to-native runtime correspondence.
+
+C62 assigns legacy-qualified SSA facade compatibility to mandatory EX-7, which is active at
+this snapshot. The landed client modules do not establish that compatibility. The ANA-10e C14
+site-encoding correction is already present in the API: `no_clobber_check` and
+`no_clobber_unchanged` pass `ET` alongside `EN` and `EF`. ANA-10a's earlier missing `sigma`
+quantifier report is preserved; C67 subsequently revises the semantic field and the published
+contract includes its quantified assignment. Neither historical diagnostic proves the revised law.
 
 At commit `3281819`, M7's Rewrite cards and the ANA-6 facade have landed. Their reports and
 independent reviews record targeted builds, checks, closed claims and computed examples. REW-7's

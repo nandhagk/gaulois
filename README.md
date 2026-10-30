@@ -32,15 +32,17 @@ contracts are in [docs/api](docs/api/), with a [name index](docs/api/names.md). 
 
 ## Status
 
-At commit `fb9436e` on 2026-10-30, milestones M2, M3, M6 and M7 are reached. Foundations, Graph,
+At commit `1e58e42` on 2026-10-30, milestones M2, M3, M4, M6 and M7 are reached. Foundations, Graph,
 Fixpoint, domain components, stratified Rules solving and REW-1 through REW-7 with the ANA-6
-facade have landed. Analyses include dense and sparse dataflow, numeric SSA values, SSA liveness
-queries, sparse evaluation graphs, SSA PRE and Andersen points-to. Float provides interval and
-NaN demand domains. The While and Ssa clients exercise landed analyses. Typed extraction and a
+facade have landed. Analyses include dense and sparse dataflow, numeric SSA values, SSA liveness,
+sparse evaluation graphs, SSA PRE, GVN, scalar recurrences, calls and points-to. Float provides
+interval and NaN demand domains. The While and Ssa clients exercise landed analyses. Typed
+extraction and a
 benchmark harness have landed.
 
-At that snapshot, 86 of 100 cards have landed. GVN, calls, memory and remaining clients are
-pending. Landed cards report checked claims and examples for their assigned contracts; they do not
-establish the whole library. See
+At that snapshot, 98 of 102 cards have landed. Sparse memory flow and store-to-load remain pending.
+Legacy-qualified SSA facade compatibility is pending the mandatory EX-7 integration. Landed cards
+report checked claims and examples for their assigned contracts; they do not establish the whole
+library. See
 [catalogue](docs/catalogue.md) for scope and [trust](docs/trust.md) for evidence. Contracts not yet
 implemented are specifications, not compiled interfaces.
