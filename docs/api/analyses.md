@@ -876,20 +876,43 @@ Definition optimise {K} (EK : encoding K) (rules : list (rewrite_rule K)) (cost 
 Inductive iexpr (V : Type) : Type :=
   | IVar (x : V)
   | IConst (z : Z)
+  | IWordConst (z : Z)
   | IAdd (a b : iexpr V)
   | IMul (a b : iexpr V).
+Arguments IVar {V}.
+Arguments IConst {V}.
+Arguments IWordConst {V}.
+Arguments IAdd {V}.
+Arguments IMul {V}.
 Fixpoint eval_iexpr {V} (inv : V -> Z) (e : iexpr V) : Z.
-(* IVar x = inv x; IConst z = z; IAdd and IMul are the sum and the product over Z *)
+(* IVar x = inv x; IConst z = IWordConst z = z; IAdd and IMul are over Z. IWordConst
+   identifies a client word literal for sign normalization; IConst remains a mathematical integer. *)
 Inductive chrec (V : Type) : Type :=
   | CInv (e : iexpr V)                    (* a loop-invariant expression, read in the entry state *)
   | CRec (base step : chrec V)            (* {b,+,s}: b at 0, plus s(k) from k to k+1 *)
-  | CGeo (base ratio : chrec V).          (* {b,*,r}: b at 0, times r(k) from k to k+1 *)
+  | CGeo (base ratio : chrec V)           (* {b,*,r}: b at 0, times r(k) from k to k+1 *)
+  | CSum (left right : chrec V)
+  | CProduct (left right : chrec V).
+Arguments CInv {V}.
+Arguments CRec {V}.
+Arguments CGeo {V}.
+Arguments CSum {V}.
+Arguments CProduct {V}.
 Fixpoint eval_chrec {V} (inv : V -> Z) (c : chrec V) (k : nat) : Z.
 (* CInv e = eval_iexpr inv e; for CRec b s: eval b 0 at 0 and eval (CRec b s) k + eval s k at
-   S k; CGeo likewise with multiplication. Evaluation is over Z; a word result is its wrap. *)
+   S k; CGeo likewise with multiplication. CSum and CProduct evaluate pointwise. Evaluation is over
+   Z; a word result is its wrap. *)
 Definition chrec_add {V} (a b : chrec V) : chrec V.      (* the CR algebra *)
 Definition chrec_mul {V} (a b : chrec V) : chrec V.
 Definition chrec_scale {V} (z : Z) (c : chrec V) : chrec V.
+(* Normalize addition of invariants, addition of additive chains and adding an invariant to an
+   additive chain structurally; use CSum otherwise. Normalize multiplication of invariants,
+   invariant scaling of additive or geometric chains, and products of two geometric chains
+   structurally. For two affine chains with invariant bases a,b and invariant steps s,t, return
+   CRec (CInv (a*b)) (CRec (CInv (a*t+b*s+s*t)) (CInv (2*s*t))), with expressions built using
+   IAdd/IMul. Use CProduct for other products. Recursive calls decrease the sum of input subtree
+   sizes. Scale z c is multiplication by CInv (IConst z). All original pointwise claims hold for
+   every constructor. These fallback nodes preserve the old constructors' evaluation equations. *)
 Inductive cmp_kind : Type := CmpLt | CmpLe | CmpNe.
 Inductive signedness : Type := Unsigned | Signed.
 (* The value an integer denotes at width w under a signedness. *)
@@ -928,7 +951,10 @@ Record scev_ops (K C : Type) : Type := ScevOps {
   mul_op : K -> bool;
   const_op : K -> option Z
 }.
-Record scev_ops_laws {K C} (so : scev_ops K C) (op_eval : K -> list C -> option C) : Prop := {
+Record scev_ops_laws {K C} (so : scev_ops K C)
+    (op_eval : K -> list C -> option C) : Prop := {
+  to_Z_canonical : forall c,
+    to_Z so c = wrap (width_of so) (to_Z so c);
   add_laws : forall o a b r, add_op so o = true -> op_eval o [a; b] = Some r ->
     to_Z so r = wrap (width_of so) (to_Z so a + to_Z so b);
   mul_laws : forall o a b r, mul_op so o = true -> op_eval o [a; b] = Some r ->
@@ -936,6 +962,7 @@ Record scev_ops_laws {K C} (so : scev_ops K C) (op_eval : K -> list C -> option 
   const_laws : forall o z r, const_op so o = Some z -> op_eval o nil = Some r ->
     to_Z so r = wrap (width_of so) z
 }.
+
 (* The invariants' values, read in the state s. *)
 Definition inv_env {S O N E V K C} (lv : loop_view S O N E V K C) (so : scev_ops K C) (s : S)
     (y : V) : Z :=
@@ -946,11 +973,189 @@ Definition stay_arrivals {S O N E V K C} (EE : encoding E) (lv : loop_view S O N
     (es : list E) : nat :=
   arrivals_since (fun e => Pos.eqb (encode EE e) (encode EE (lentry lv)))
     (fun e => Pos.eqb (encode EE e) (encode EE (lback lv))) es.
-Record loop_view_laws {S O N E V K C} (m : semantics S O) (so : scev_ops K C)
-    (lv : loop_view S O N E V K C) : Prop := {
+
+Fixpoint signed_iexpr {V} (w : width) (sg : signedness) (e : iexpr V) : iexpr V :=
+  match e with
+  | IVar x => IVar x
+  | IConst z => IConst z
+  | IWordConst z => IConst (view_z w sg z)
+  | IAdd a b => IAdd (signed_iexpr w sg a) (signed_iexpr w sg b)
+  | IMul a b => IMul (signed_iexpr w sg a) (signed_iexpr w sg b)
+  end.
+
+Fixpoint signed_chrec {V} (w : width) (sg : signedness) (c : chrec V) : chrec V :=
+  match c with
+  | CInv e => CInv (signed_iexpr w sg e)
+  | CRec b s => CRec (signed_chrec w sg b) (signed_chrec w sg s)
+  | CGeo b r => CGeo (signed_chrec w sg b) (signed_chrec w sg r)
+  | CSum a b => CSum (signed_chrec w sg a) (signed_chrec w sg b)
+  | CProduct a b => CProduct (signed_chrec w sg a) (signed_chrec w sg b)
+  end.
+
+Definition signed_inv_env {S O N E V K C}
+    (lv : loop_view S O N E V K C) (so : scev_ops K C)
+    (sg : signedness) (s : S) (y : V) : Z :=
+  view_z (width_of so) sg (inv_env lv so s y).
+
+Inductive scev_expr (V : Type) : Type :=
+  | SOutside (x : V)
+  | SPhi (x : V)
+  | SAdd (result : V) (left right : scev_expr V)
+  | SMul (result : V) (left right : scev_expr V)
+  | SConst (result : V) (z : Z).
+
+Inductive scev_update : Type :=
+  | SAddUpdate
+  | SMulUpdate
+  | SDoubleUpdate.
+
+Record scev_binding (V : Type) : Type := ScevBinding {
+  sb_phi : V;
+  sb_base : V;
+  sb_update_value : V;
+  sb_kind : scev_update;
+  sb_other : option (scev_expr V);
+  sb_phi_first : bool
+}.
+
+Record scev_plan (V : Type) : Type := ScevPlan {
+  sp_bindings : list (scev_binding V);
+  sp_target : V
+}.
+
+Arguments SOutside {V}.
+Arguments SPhi {V}.
+Arguments SAdd {V}.
+Arguments SMul {V}.
+Arguments SConst {V}.
+Arguments ScevBinding {V}.
+Arguments ScevPlan {V}.
+Arguments sb_phi {V}.
+Arguments sb_base {V}.
+Arguments sb_update_value {V}.
+Arguments sb_kind {V}.
+Arguments sb_other {V}.
+Arguments sb_phi_first {V}.
+Arguments sp_bindings {V}.
+Arguments sp_target {V}.
+
+Definition scev_plan_check {S O N E V K C}
+    (EN : encoding N) (EV : encoding V) (inventory : list V)
+    (lv : loop_view S O N E V K C) (so : scev_ops K C)
+    (plan : scev_plan V) : bool.
+
+Definition scev_compile_plan {V} (EV : encoding V) (plan : scev_plan V)
+    : option (chrec V).
+
+Definition recognise_plan {S O N E V K C}
+    (EN : encoding N) (EV : encoding V) (inventory : list V)
+    (lv : loop_view S O N E V K C) (so : scev_ops K C) (x : V)
+    : option (chrec V * scev_plan V).
+
+(** A successful plan producer returns a checked plan that compiles to its recurrence. *)
+Theorem recognise_plan_checked {S O N E V K C}
+    (EN : encoding N) (EV : encoding V) (inventory : list V)
+    (lv : loop_view S O N E V K C) (so : scev_ops K C) (x : V) ch plan :
+  recognise_plan EN EV inventory lv so x = Some (ch, plan) ->
+  sp_target plan = x /\ scev_plan_check EN EV inventory lv so plan = true /\
+  scev_compile_plan EV plan = Some ch.
+
+Fixpoint iexpr_variables {V} (e : iexpr V) : list V :=
+  match e with
+  | IVar x => [x]
+  | IConst _ | IWordConst _ => []
+  | IAdd a b | IMul a b => iexpr_variables a ++ iexpr_variables b
+  end.
+
+Fixpoint scev_expr_operations {V} (e : scev_expr V) : list V :=
+  match e with
+  | SOutside _ | SPhi _ => []
+  | SAdd x a b | SMul x a b =>
+      x :: scev_expr_operations a ++ scev_expr_operations b
+  | SConst x _ => [x]
+  end.
+
+Definition scev_expr_root {V} (e : scev_expr V) : V :=
+  match e with
+  | SOutside x | SPhi x | SConst x _ => x
+  | SAdd x _ _ | SMul x _ _ => x
+  end.
+
+Definition scev_plan_operations {V} (p : scev_plan V) : list V :=
+  flat_map (fun b => sb_update_value b ::
+    match sb_other b with
+    | Some e => scev_expr_operations e
+    | None => []
+    end)
+    (sp_bindings p).
+
+(* Triangular recognition plan validation and compilation; write sv for lssa lv:
+Each plan operation list contains each binding's update result and every `SAdd`,
+`SMul`, or `SConst` result in its expression, including dependencies' expressions.
+The exact checker accepts precisely when all the following hold:
+
+1. Every variable appearing in the target, bindings or expression trees belongs to
+   the finite inventory, tested through a prepared index. The list of `sb_phi`s has
+   no duplicates, is nonempty, and ends in `sp_target`. Every binding is reachable
+   from the target through `SPhi` references; unrelated extra bindings fail.
+2. For each binding `b`, `def sv (sb_phi b) = Param (lheader lv) i` for some `i`,
+   and `home sv (sb_phi b) = lheader lv`;
+   the `i`th entry and back arguments are exactly `sb_base b` and
+   `sb_update_value b`. The base's home is outside the body; the update result's
+   home is inside. All node/value equality tests use `EN`/`EV`.
+3. An `SOutside y` has outside-body home. An `SPhi y` names a binding strictly
+   earlier in the list. The expression root is its value for either leaf and its
+   declared result for each operation. Each `SAdd x a b` or `SMul x a b` has
+   inside-body home and `def sv x = Op o [root a; root b]` with the respective
+   operator flag true; recursively check both operands. Each `SConst x z` has
+   inside-body home and `def sv x = Op o []` with `const_op so o = Some z`.
+4. For `SAddUpdate` and `SMulUpdate`, `sb_other` is `Some e`; the update is an
+   `Op` with the appropriate flag and operands exactly `[sb_phi b; root e]` when
+   `sb_phi_first` is true, or `[root e; sb_phi b]` otherwise. The other root must
+   not equal `sb_phi b`; all its `SPhi`s obey item 3. For `SDoubleUpdate`,
+   `sb_other = None`, `sb_phi_first = true`, and the update is an add operation
+   with operands exactly `[sb_phi b; sb_phi b]`.
+
+Compile each `SOutside y` to `CInv (IVar y)`, each `SPhi y` to the previously
+compiled recurrence, and expression operation nodes to the corresponding
+`chrec_add`, `chrec_mul`, or `CInv (IWordConst z)`. Compile an ordinary binding with
+base `CInv (IVar (sb_base b))` as `CRec base other` for `SAddUpdate` or
+`CGeo base other` for `SMulUpdate`; compile `SDoubleUpdate` as
+`CGeo base (CInv (IConst 2))`. The result is the compiled target. A recognized
+value therefore means a completed lower-rank dependency independent of the current
+binding's distinguished feedback operand. The supported scope explicitly excludes
+unsupported mutual feedback and nonlinear direct self-feedback; it does not assert
+that those systems have no representation.
+
+Prove both soundness and completeness of scev_plan_check with respect to exactly
+conditions 1–4 above, and prove that the indexed compiler agrees with the stated
+recurrence translation. A passing example alone does not establish either direction.
+
+The producer makes a depth-first traversal with memoized completed plans and an
+indexed active set; the designated direct feedback is consumed as a terminal before
+cycle detection. It constructs a duplicate-free dependency list, emits only
+target-reachable bindings, checks the plan, and returns the compiled target.
+Prefer add to multiply if flags overlap, the first operand to the second when both
+are viable, and the double-add case when both operands equal the phi. Construct
+inventory membership, definition/operand, phi-position/rank and edge-argument indexes once;
+binary fuel counts successful first visits to indexed values, and a visited node is never
+expanded twice. Preserve indexed memoized dependencies in execution, even though the declarative
+plan presents trees: do not repeatedly traverse shared subtrees or scan binding or edge lists
+inside the traversal. Prove the corresponding agreement with the declarative checker and compiler;
+no asymptotic time claim follows without a separate proof. It must publish a lemma connecting every
+successful recognition to its checked plan and compiled recurrence, not assume
+that lemma as a client law. Positive tests must exercise nested recognized phis,
+both add and multiply, and self-add; negative tests must exercise unsupported
+mutual and nonlinear feedback, malformed arguments and missing inventory.
+*)
+
+Record loop_view_laws {S O N E V K C} (m : semantics S O)
+    (EN : encoding N) (EV : encoding V) (inventory : list V)
+    (so : scev_ops K C) (lv : loop_view S O N E V K C) : Prop := {
   l_ssa : ssa_view_laws m (lssa lv);
   l_strict : strict_ssa_laws m (lssa lv);
-  l_header_not_entry : ~ In (lheader lv) (Graph.entries (cfg (base (lssa lv))));
+  l_header_not_entry :
+    ~ In (lheader lv) (Graph.entries (cfg (base (lssa lv))));
   l_entry_edge : In (lentry lv) (edges_of (cfg (base (lssa lv)))) /\
     Graph.target (cfg (base (lssa lv))) (lentry lv) = lheader lv /\
     lbody lv (Graph.source (cfg (base (lssa lv))) (lentry lv)) = false;
@@ -958,23 +1163,78 @@ Record loop_view_laws {S O N E V K C} (m : semantics S O) (so : scev_ops K C)
     Graph.target (cfg (base (lssa lv))) (lback lv) = lheader lv /\
     lbody lv (Graph.source (cfg (base (lssa lv))) (lback lv)) = true;
   l_simple : forall e, In e (edges_of (cfg (base (lssa lv)))) ->
-    Graph.target (cfg (base (lssa lv))) e = lheader lv -> e = lentry lv \/ e = lback lv;
-  (* the back edge is taken only when the exit test holds *)
-  l_back_test : forall s l s' t, reachable_state m s -> point (base (lssa lv)) s = lheader lv ->
-    step m s l s' -> taken (base (lssa lv)) s l s' (lback lv) -> ltest lv = Some t ->
+    Graph.target (cfg (base (lssa lv))) e = lheader lv ->
+    e = lentry lv \/ e = lback lv;
+  l_header_inside : lbody lv (lheader lv) = true;
+  l_initial_outside : forall n,
+    In n (Graph.entries (cfg (base (lssa lv)))) -> lbody lv n = false;
+  l_single_ingress : forall e, In e (edges_of (cfg (base (lssa lv)))) ->
+    lbody lv (Graph.source (cfg (base (lssa lv))) e) = false ->
+    lbody lv (Graph.target (cfg (base (lssa lv))) e) = true -> e = lentry lv;
+  l_phi_binding : forall s tr s' e x i,
+    reachable_state m s -> step m s tr s' ->
+    taken (base (lssa lv)) s tr s' e ->
+    Graph.target (cfg (base (lssa lv))) e = lheader lv ->
+    def (lssa lv) x = Param (lheader lv) i ->
+    val (lssa lv) s' x =
+      match nth_error (edge_args (lssa lv) e) i with
+      | Some y => val (lssa lv) s y
+      | None => None
+      end;
+  l_phi_stay : forall s tr s' x i,
+    reachable_state m s -> step m s tr s' ->
+    stays (base (lssa lv)) s tr s' ->
+    point (base (lssa lv)) s = lheader lv ->
+    def (lssa lv) x = Param (lheader lv) i ->
+    val (lssa lv) s' x = val (lssa lv) s x;
+  l_test_outside : forall t y, ltest lv = Some t ->
+    In y (iexpr_variables (t_bound t)) ->
+    lbody lv (home (lssa lv) y) = false;
+  l_back_test : forall s tr s' t,
+    reachable_state m s -> step m s tr s' ->
+    taken (base (lssa lv)) s tr s' (lback lv) -> ltest lv = Some t ->
     exists c, val (lssa lv) s (t_lhs t) = Some c /\
-      test_holds (width_of so) (t_sign t) (t_cmp t) (to_Z so c) (eval_iexpr (inv_env lv so s) (t_bound t))
+      test_holds (width_of so) (t_sign t) (t_cmp t) (to_Z so c)
+        (eval_iexpr (inv_env lv so s) (t_bound t));
+  l_plan_op_at_back : forall s tr s' plan x o args c,
+    reachable_state m s -> step m s tr s' ->
+    taken (base (lssa lv)) s tr s' (lback lv) ->
+    scev_plan_check EN EV inventory lv so plan = true ->
+    In x (scev_plan_operations plan) -> def (lssa lv) x = Op o args ->
+    val (lssa lv) s x = Some c ->
+    exists cs, Forall2 (fun y d => val (lssa lv) s y = Some d) args cs /\
+      op_eval (lssa lv) o cs = Some c
 }.
-Definition recognise {S O N E V K C} (lv : loop_view S O N E V K C) (so : scev_ops K C) (x : V) :
-  option (chrec V).
-(* x is a parameter of the header whose back-edge argument is x plus (or times) an invariant or a
-   recognised value; its base is the entry-edge argument. A value is invariant when its home lies
-   outside the body; the CR algebra handles the operators. *)
+
+Definition recognise {S O N E V K C}
+    (EN : encoding N) (EV : encoding V) (inventory : list V)
+    (lv : loop_view S O N E V K C) (so : scev_ops K C) (x : V) : option (chrec V) :=
+  option_map fst (recognise_plan EN EV inventory lv so x).
+
+(** Sign normalization preserves an invariant expression's wrapped value. *)
+Theorem signed_iexpr_wrap {V} (w : width) (sg : signedness)
+    (inv : V -> Z) (e : iexpr V) :
+  wrap w (eval_iexpr inv e) =
+  wrap w (eval_iexpr (fun y => view_z w sg (inv y)) (signed_iexpr w sg e)).
+
+(** Sign normalization preserves a recurrence's wrapped value at every index. *)
+Theorem signed_chrec_wrap {V} (w : width) (sg : signedness)
+    (inv : V -> Z) (c : chrec V) (k : nat) :
+  wrap w (eval_chrec inv c k) =
+  wrap w (eval_chrec (fun y => view_z w sg (inv y)) (signed_chrec w sg c) k).
 Definition trip_count {V} (inv : V -> Z) (w : width) (sg : signedness) (c : cmp_kind)
     (ch : chrec V) (bound : iexpr V) : option N.
 (* the first k at which the test `eval_chrec inv ch k  c  eval_iexpr inv bound` (read at w under sg)
    fails, as a binary natural, when ch is an affine {b,+,s} whose step s is a constant and the
-   bound is finite in Z; None otherwise *)
+   bound is finite in Z; None otherwise. This is the first failure in the wrapped word sequence
+   even without no-wrap evidence. Detect a periodic sequence with no failure and return None;
+   an unwrapped arithmetic result is not sufficient. For example width 2, unsigned [0,+,2] < 3
+   alternates 0 and 2 forever and returns None, even though unwrapped arithmetic first fails at 2.
+   Use binary modular-period reasoning and prove the exact first-hit result for all comparisons
+   and signednesses; do not enumerate the period with unary fuel or repeatedly evaluate chrec.
+   One possible route biases signed residues by m/2, uses period m/gcd(step,m), counts interval
+   hits by Euclidean floor sums and binary-searches the first nonzero prefix count. This route is
+   a proof strategy, not a proven runtime bound or a requirement to use that implementation. *)
 Definition nowrap_check {V} (w : width) (sg : signedness) (inv : V -> Z) (ch : chrec V)
     (bound : iexpr V) (t : N) : bool.
 (* separate evidence: eval ch k for every k <= t, and the bound, lie inside the range of w under
@@ -1931,12 +2191,16 @@ Theorem eval_chrec_scale {V} (inv : V -> Z) (z : Z) (c : chrec V) (k : nat) :
 (** Recognition is sound: at the k-th arrival at the header during a stay, the value of a recognised
     header parameter is the recurrence evaluated at k, wrapped to the width. The arrival count is a
     function of the run prefix. *)
-Theorem scev_sound {S O N E V K C} (m : semantics S O) (EE : encoding E)
+Theorem scev_sound {S O N E V K C} (m : semantics S O)
+    (EN : encoding N) (EE : encoding E) (EV : encoding V) (inventory : list V)
     (lv : loop_view S O N E V K C) (so : scev_ops K C) (x : V) (ch : chrec V) :
-  loop_view_laws m so lv -> scev_ops_laws so (op_eval (lssa lv)) -> recognise lv so x = Some ch ->
+  loop_view_laws m EN EV inventory so lv ->
+  scev_ops_laws so (op_eval (lssa lv)) ->
+  recognise EN EV inventory lv so x = Some ch ->
   forall s0 es s c, initial m s0 -> run_edges m (base (lssa lv)) s0 es s ->
     point (base (lssa lv)) s = lheader lv -> val (lssa lv) s x = Some c ->
-    to_Z so c = wrap (width_of so) (eval_chrec (inv_env lv so s) ch (stay_arrivals EE lv es)).
+    to_Z so c = wrap (width_of so)
+      (eval_chrec (inv_env lv so s) ch (stay_arrivals EE lv es)).
 (** Trip counts, with the no-wrap evidence checked separately: the exit test holds for the first
     t arrivals and fails at the t-th, and no value up to t, nor the bound, leaves the range of the
     width under the signedness. *)
@@ -1949,24 +2213,32 @@ Theorem trip_count_sound {V} (inv : V -> Z) (w : width) (sg : signedness) (cmp :
   in_range w sg (eval_iexpr inv bound).
 (** The trip count links the loop's exit test: when the test's left side is a recognised recurrence
     and the trip count is t, a stay arrives at the header at most t times after the first. *)
-Theorem loop_trip_sound {S O N E V K C} (m : semantics S O) (EE : encoding E)
-    (lv : loop_view S O N E V K C) (so : scev_ops K C) (tst : loop_test V) (ch : chrec V) (t : N) :
-  loop_view_laws m so lv -> scev_ops_laws so (op_eval (lssa lv)) -> ltest lv = Some tst ->
-  recognise lv so (t_lhs tst) = Some ch ->
+Theorem loop_trip_sound {S O Node E V K C} (m : semantics S O)
+    (EN : encoding Node) (EE : encoding E) (EV : encoding V) (inventory : list V)
+    (lv : loop_view S O Node E V K C) (so : scev_ops K C)
+    (tst : loop_test V) (ch : chrec V) (t : N) :
+  loop_view_laws m EN EV inventory so lv ->
+  scev_ops_laws so (op_eval (lssa lv)) -> ltest lv = Some tst ->
+  recognise EN EV inventory lv so (t_lhs tst) = Some ch ->
   forall s0 es s, initial m s0 -> run_edges m (base (lssa lv)) s0 es s ->
     point (base (lssa lv)) s = lheader lv ->
-    trip_count (inv_env lv so s) (width_of so) (t_sign tst) (t_cmp tst) ch (t_bound tst) = Some t ->
-    nowrap_check (width_of so) (t_sign tst) (inv_env lv so s) ch (t_bound tst) t = true ->
+    trip_count (signed_inv_env lv so (t_sign tst) s) (width_of so) (t_sign tst) (t_cmp tst)
+      (signed_chrec (width_of so) (t_sign tst) ch)
+      (signed_iexpr (width_of so) (t_sign tst) (t_bound tst)) = Some t ->
+    nowrap_check (width_of so) (t_sign tst) (signed_inv_env lv so (t_sign tst) s)
+      (signed_chrec (width_of so) (t_sign tst) ch)
+      (signed_iexpr (width_of so) (t_sign tst) (t_bound tst)) t = true ->
     (N.of_nat (stay_arrivals EE lv es) <= t)%N.
 ```
-Proof idea: the algebra by induction on the recurrence; `scev_sound` by induction on the run prefix:
-an entry edge resets the count and gives the base from the entry-edge argument (`value_origin`), a
-back edge adds one and gives the step, other edges keep the count, and invariants do not change
-during the stay (`strict_ssa_laws`); trip counts are exact arithmetic for an affine recurrence, with
-no wrap by the evidence; `loop_trip_sound` by induction on the prefix with `l_back_test`: the back
-edge is taken only if the test holds at the current arrival, which by `trip_count_sound` and
-`scev_sound` means the arrival count is below t. Counted loops are the idiom that this card detects;
-fill and copy idioms are not claimed. Card: ANA-7.
+Proof idea: prove the pointwise algebra and signed normalization congruence constructively. Prove
+recognition-plan checking and compilation, then use simultaneous induction over the ranked
+bindings and run prefix. A body ingress resets the count; option-exact phi binding supplies the
+base and backward definedness, plan-local operation equations supply each step, and outside-home
+values and header parameters stay stable during the current stay. On each back edge, transport its
+actual source guard and bound to the preceding header arrival. Signed normalization is congruent
+modulo the word width, so the arithmetic theorem and its separate no-wrap evidence bound the next
+arrival. This includes zero and re-entry. Counted loops are the idiom detected; fill and copy
+idioms are not claimed. Card: ANA-7.
 
 ### ANA-8
 

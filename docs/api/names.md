@@ -1120,6 +1120,10 @@ The entries below retain the full compatibility inventory and their original dec
   `gvn_loop_recomputed`, `gvn_loop_sound` — ANA-5 loop evidence and application.
 - `count_up`, `count_up_n`, `count_up_chrec`, `count_up_inv` — Definitions; ANA-7 recurrence
   fixture.
+- `count_up_inventory`, `count_up_ops`, `count_up_loop` — Definitions; ANA-7 recognition inputs
+  and actual activation adapter.
+- `count_up_ops_laws`, `count_up_loop_laws`, `count_up_recognise`, `count_up_recurrence`,
+  `count_up_trip_bound` — Theorems; ANA-7 client laws and generic recurrence and trip applications.
 - `chain_graph`, `chain_writes`, `chain_writes_clobber`, `chain_reads`, `chain_ssa` — Definitions;
   ANA-10e MemorySSA fixtures.
 
@@ -2457,6 +2461,7 @@ ANA-3 owns the remaining declarations in this file.
 - `iexpr` — Inductive; Invariant expressions built from variables, constants, sums and products.
 - `IVar` — Constructor; An invariant variable expression.
 - `IConst` — Constructor; An invariant integer constant expression.
+- `IWordConst` — Constructor; A client word literal with explicit signed interpretation.
 - `IAdd` — Constructor; The sum of two invariant expressions.
 - `IMul` — Constructor; The product of two invariant expressions.
 - `eval_iexpr` — Fixpoint; Evaluates an invariant expression in an invariant environment.
@@ -2464,6 +2469,7 @@ ANA-3 owns the remaining declarations in this file.
 - `CInv` — Constructor; A loop-invariant recurrence expression.
 - `CRec` — Constructor; An additive chain of recurrences.
 - `CGeo` — Constructor; A geometric chain of recurrences.
+- `CSum`, `CProduct` — Constructors; Pointwise sum and product fallback expressions.
 - `eval_chrec` — Fixpoint; Evaluates a recurrence at an iteration count.
 - `chrec_add` — Definition; Adds two chains of recurrences.
 - `chrec_mul` — Definition; Multiplies two chains of recurrences.
@@ -2503,7 +2509,23 @@ ANA-3 owns the remaining declarations in this file.
 - `add_laws` — Field; Addition agrees with the integer interpretation.
 - `mul_laws` — Field; Multiplication agrees with the integer interpretation.
 - `const_laws` — Field; Constants agree with the integer interpretation.
+- `to_Z_canonical` — Field; Concrete observations are canonical word representatives.
 - `inv_env` — Definition; Values of loop invariants in an entry state.
+- `signed_iexpr`, `signed_chrec`, `signed_inv_env` — Definitions; Sign-aware normalization and
+  environment for loop trip evidence.
+- `signed_iexpr_wrap`, `signed_chrec_wrap` — Theorems; Normalization preserves wrapped values.
+- `scev_expr`, `SOutside`, `SPhi`, `SAdd`, `SMul`, `SConst` — Inductive and constructors;
+  Finite expressions describing recognized updates.
+- `scev_update`, `SAddUpdate`, `SMulUpdate`, `SDoubleUpdate` — Inductive and constructors;
+  Supported recurrence update kinds.
+- `scev_binding`, `ScevBinding`, `sb_phi`, `sb_base`, `sb_update_value`, `sb_kind`, `sb_other`,
+  `sb_phi_first` — Record, constructor and fields; Syntactic phi binding description.
+- `scev_plan`, `ScevPlan`, `sp_bindings`, `sp_target` — Record, constructor and fields;
+  Ranked recurrence recognition plan.
+- `iexpr_variables`, `scev_expr_root`, `scev_expr_operations`, `scev_plan_operations` —
+  Definitions; Finite syntactic plan observations.
+- `scev_plan_check`, `scev_compile_plan`, `recognise_plan`, `recognise_plan_checked` —
+  Definitions and theorem; Plan checking, compilation and producer correctness.
 - `stay_arrivals` — Definition; Number of loop-header arrivals along a run prefix.
 - `loop_view_laws` — Record; SSA, entry, back-edge and exit-test laws for the loop.
 - `l_ssa` — Field; The loop's SSA view satisfies its laws.
@@ -2512,6 +2534,10 @@ ANA-3 owns the remaining declarations in this file.
 - `l_entry_edge` — Field; Loop entry edges satisfy the view's entry condition.
 - `l_back_edge` — Field; Loop back edges satisfy the view's back-edge condition.
 - `l_simple` — Field; The loop has the required simple control-flow form.
+- `l_header_inside`, `l_initial_outside`, `l_single_ingress` — Fields; Header membership and
+  all-body single ingress from graph entries.
+- `l_phi_binding`, `l_phi_stay` — Fields; Exact incoming parameter binding and header-stay frame.
+- `l_test_outside`, `l_plan_op_at_back` — Fields; Bound invariance and local operation observations.
 - `l_back_test` — Field; Back edges obey the loop exit test.
 - `recognise` — Definition; Recognises a recurrence for an SSA value.
 - `trip_count` — Definition; Computes a trip count for a supported recurrence and test.

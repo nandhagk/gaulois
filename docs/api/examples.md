@@ -1449,6 +1449,62 @@ Definition count_up_n : vid := 0.
 Definition count_up_chrec : chrec vid := CRec (CInv (IVar 1)) (CInv (IVar 2)).   (* {i0, +, one} *)
 Definition count_up_inv : vid -> Z.
 (* the entry state's values of the invariants: i0 = 0, one = 1, n = 5, every other value 0 *)
+(* ANA-7 also proves the following actual activation adapter and applications. *)
+Definition count_up_inventory : list vid := [0; 1; 2; 3; 4; 5].
+
+Definition count_up_ops : scev_ops sop cval :=
+  {| width_of := 32%positive;
+     to_Z := fun c => match c with
+      | VInt W32 z => wrap 32%positive z
+      | _ => 0%Z
+      end;
+     add_op := fun o => match o with OBin W32 BAdd => true | _ => false end;
+     mul_op := fun o => match o with OBin W32 BMul => true | _ => false end;
+     const_op := fun o => match o with OConst (VInt W32 z) => Some z | _ => None end |}.
+
+Definition count_up_loop : loop_view astate event label ssa_edge vid sop cval :=
+  {| lssa := ssa_block_view (fun _ _ => None) count_up 0;
+     lheader := 1;
+     lbody := fun n => Nat.eqb n 1 || Nat.eqb n 2;
+     lentry := SsaEdge 0 1 0;
+     lback := SsaEdge 2 1 0;
+     ltest := Some {| t_cmp := CmpLt; t_sign := Unsigned; t_lhs := 3;
+                      t_bound := IVar count_up_n |} |}.
+
+Theorem count_up_ops_laws :
+  scev_ops_laws count_up_ops (ViewsSsa.op_eval (lssa count_up_loop)).
+
+Theorem count_up_loop_laws :
+  loop_view_laws (activation (fun _ _ => None) count_up 0)
+    label_encoding nat_encoding count_up_inventory count_up_ops count_up_loop.
+
+Theorem count_up_recognise :
+  recognise label_encoding nat_encoding count_up_inventory count_up_loop count_up_ops 3 =
+    Some count_up_chrec.
+
+Theorem count_up_recurrence :
+  forall s0 es s c,
+    initial (activation (fun _ _ => None) count_up 0) s0 ->
+    run_edges (activation (fun _ _ => None) count_up 0) (base (lssa count_up_loop)) s0 es s ->
+    point (base (lssa count_up_loop)) s = lheader count_up_loop ->
+    val (lssa count_up_loop) s 3 = Some c ->
+    to_Z count_up_ops c = wrap (width_of count_up_ops)
+      (eval_chrec (inv_env count_up_loop count_up_ops s) count_up_chrec
+        (stay_arrivals ssa_edge_encoding count_up_loop es)).
+Theorem count_up_trip_bound : forall s0 es s t,
+  initial (activation (fun _ _ => None) count_up 0) s0 ->
+  run_edges (activation (fun _ _ => None) count_up 0) (base (lssa count_up_loop)) s0 es s ->
+  point (base (lssa count_up_loop)) s = lheader count_up_loop ->
+  trip_count (signed_inv_env count_up_loop count_up_ops Unsigned s) 32%positive Unsigned CmpLt
+    (signed_chrec 32%positive Unsigned count_up_chrec)
+    (signed_iexpr 32%positive Unsigned (IVar count_up_n)) = Some t ->
+  nowrap_check 32%positive Unsigned (signed_inv_env count_up_loop count_up_ops Unsigned s)
+    (signed_chrec 32%positive Unsigned count_up_chrec)
+    (signed_iexpr 32%positive Unsigned (IVar count_up_n)) t = true ->
+  (N.of_nat (stay_arrivals ssa_edge_encoding count_up_loop es) <= t)%N.
+(* Also provide actual reachable zero-bound and positive-bound executions. Establish the client
+   laws on all reachable prefixes; finite examples do not replace those laws. *)
+
 Example scev_count_up_trip :
   trip_count count_up_inv 32%positive Unsigned CmpLt count_up_chrec (IVar count_up_n) = Some 5%N /\
   nowrap_check 32%positive Unsigned count_up_inv count_up_chrec (IVar count_up_n) 5%N = true.
