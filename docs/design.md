@@ -31,9 +31,9 @@ contributions. Static systems over-approximate reads and contributions and suppo
 arguments, scheduling and cut-point checking. Dynamic systems use the full checker and fuel solver.
 A checked precision pass keeps its candidate only when the checker accepts it.
 
-Engines return a function with a post-solution proof. Internal dominance and WTO producers have
-landed; MemorySSA producers remain planned alongside independent checkers for external or cached
-candidates. The legacy explanation checker remains the boundary for external replay; arbitrary
+Engines return a function with a post-solution proof. Internal dominance, WTO and two MemorySSA
+producers have landed alongside independent checkers for external or cached candidates. The legacy
+explanation checker remains the boundary for external replay; arbitrary
 narrowing and partial solutions retain their checked acceptance requirements. Selectable
 LT and Semi-NCA dominance implementations prove the same reachable dominance relation. Schedules
 with widening may produce different post-solutions.

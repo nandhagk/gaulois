@@ -5,13 +5,38 @@ proved theorem whose assumptions meet the policy below. A statement that compile
 it does not establish a proof. A smoke check reports an outcome on examples. An experiment reports
 measurements and does not prove a general complexity or soundness claim.
 
-At commit `1e58e42` on 2026-10-30, M2, M3, M4, M6 and M7 are reached. Landed reports and reviews
+At commit `63e352a` on 2026-10-30, M2 through M7 are reached. Landed reports and reviews
 record targeted builds, examples, checks and assumption audits for their assigned claims. EX-4's
 report records 123 closed assumption checks and computed While examples; its review independently
 observed the repository check pass and inspected the worker's build and test evidence. These are
 incremental checks, not a fresh full build. They establish claims under their stated premises, not
 unimplemented contracts. The API documents are specifications and have not been compiled as a
 whole. FINAL is planned to check a fresh full build.
+
+M5's memory cards include both directly proved MemorySSA builders, conservative clobber walks,
+legacy projection and sparse flow. The direct walker does not depend on legacy checker acceptance.
+C21 restricts candidates to reachable loads and, for `MDef`, the right function and a reachable
+definition; its check covers all successor walks, including revisits and parallel edges. Sparse
+flow uses the existing total solver and covers actual path-specific sources; agreement of the two
+builders gives membership in both results, not equality of their conservative source sets.
+Forwarding requires successful accesses to the same allocation identity and range, client encoding
+and decoding laws, and the stated byte and path premises. Unchanged bytes alone establish neither
+accessibility nor a nontrapping load, and a site need not identify a unique object.
+
+C20's historical-site law says that on a reachable step, `bsite bv s l0 = Some t` implies
+`bsite bv s' l0 = Some t`. It retains the same identity even after free, when a byte may be
+unavailable. C67 seeds each listed node with its reached finite boundary, removes reads after
+the definite-write union, requires empty boundaries at actual endings, and requires step agreement
+for reached assignments and ending agreement at the actual boundary. The original dead-store
+behaviour theorem retains its argument list and conclusion. Its historical missing `forall sigma`
+is a separate C14 typing repair already in the API; C67's boundary and transfer changes are
+semantic rulings. The earlier empty-seed diagnostic does not establish a defect in C67.
+
+The accepted memory reviews independently rerun targeted builds and inspect the workers' finite
+examples and assumption audits. ANA-10d's review inspects the worker's repository check; the other
+memory reviews independently rerun that check. ANA-10f's review inspects 22 examples and a
+113-root closed-context audit; the examples are finite observations. These checks are incremental,
+and client laws remain premises. FINAL's fresh full build remains a separate gate.
 
 ANA-7's C64 contract retains recurrence algebra, signed and raw observations, exact first
 failure over wrapped values and separate no-wrap evidence. Its supported recognition domain
@@ -42,8 +67,11 @@ and context examples. The review inspects the final audit and tests rather than 
 The review records a scratch working-directory deviation and preserved cache evidence. These
 incremental checks do not replace FINAL or prove source-to-native runtime correspondence.
 
-C62 assigns legacy-qualified SSA facade compatibility to mandatory EX-7, which is active at
-this snapshot. The landed client modules do not establish that compatibility. The ANA-10e C14
+C62 assigns legacy-qualified SSA facade compatibility to mandatory EX-7, now landed. Its accepted
+review compares all 101 aliases with their source declarations and argument metadata, inspects
+the worker's closed-root audits and independently reruns the targeted build and repository check.
+It also inspects actual consumers and qualified computations; these incremental checks do not
+replace FINAL. The ANA-10e C14
 site-encoding correction is already present in the API: `no_clobber_check` and
 `no_clobber_unchanged` pass `ET` alongside `EN` and `EF`. ANA-10a's earlier missing `sigma`
 quantifier report is preserved; C67 subsequently revises the semantic field and the published
