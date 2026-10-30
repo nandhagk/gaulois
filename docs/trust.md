@@ -45,7 +45,7 @@ C13 and C56 permit `Gaulois.Float` theorems to depend only on these exact axioms
 `Stdlib.Logic.FunctionalExtensionality.functional_extensionality_dep`, and
 `Stdlib.Logic.Classical_Prop.classic`. Pinned Flocq operations and bit decoders inherit `classic`
 as well as the classical real-number foundations. The owner approves this additional dependency
-under C56. The claims checker must use the same exact list; its update remains part of FLT-1.
+under C56. The claims checker must use the same exact list.
 This allowance does not extend to other packages, examples or tests.
 
 ## Producers and checkers

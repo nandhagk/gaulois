@@ -38,8 +38,8 @@ facade have landed. Analyses include dense and sparse dataflow, numeric SSA valu
 queries, sparse evaluation graphs, SSA PRE and Andersen points-to. The While and Ssa clients
 exercise landed analyses. Typed extraction and a benchmark harness have landed.
 
-The snapshot has 85 of 100 cards landed. GVN, calls, memory and remaining clients are pending;
-optional Float is under independent review. Landed cards report kernel-checked claims and examples
+At that snapshot, 85 of 100 cards have landed. GVN, calls, memory and remaining clients are
+pending; optional Float is under independent review. Landed cards report checked claims and examples
 for their assigned contracts; they do not establish the whole library. See
 [catalogue](docs/catalogue.md) for scope and [trust](docs/trust.md) for evidence. Contracts not yet
 implemented are specifications, not compiled interfaces.
