@@ -2,13 +2,13 @@
 
     Two stores to distinct sites precede a load from the first site.
     For example, changing the second store to a partial overlap invalidates the candidate.
-    Builds on: ExamplesSsaAnalyses and AnalysesMemoryLegacy. *)
+    Builds on: ExamplesSsaAnalysisBase and AnalysesMemoryLegacy. *)
 
 From Stdlib Require Import List ZArith.
 From Gaulois.Graph Require Import GraphCore.
 From Gaulois.Domains Require Import DomainsFootprint.
 From Gaulois.Analyses Require Import AnalysesMemoryLegacy.
-From Gaulois.Examples.Ssa Require Import ExamplesSsaAnalyses.
+From Gaulois.Examples.Ssa Require Import ExamplesSsaAnalysisBase.
 Import List.ListNotations.
 
 (** The two edge identities leave nodes zero and one in a three-node chain. *)

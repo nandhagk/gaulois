@@ -2,7 +2,7 @@
 
     These clients connect checked symbolic classes to actual activation histories.
     For example, two separately bound additions agree at a later dominated use.
-    Builds on: ExamplesSsaAnalyses, ExamplesSsaStrict and AnalysesNumbering. *)
+    Builds on: ExamplesSsaAnalysisBase, ExamplesSsaStrict and AnalysesNumbering. *)
 
 From Stdlib Require Import List Bool Arith Lia ZArith.
 From Gaulois.Collections Require Import CollectionsEncoding CollectionsMap.
@@ -12,7 +12,7 @@ From Gaulois.Analyses Require Import AnalysesNumbering.
 From Gaulois.Examples.While Require Import ExamplesWhileSemantics.
 From Gaulois.Examples.Ssa Require Import ExamplesSsaSyntax ExamplesSsaTyping ExamplesSsaSemantics
   ExamplesSsaTypingProofs ExamplesSsaBridge ExamplesSsaActivation ExamplesSsaViews
-  ExamplesSsaStrict ExamplesSsaAnalyses.
+  ExamplesSsaStrict ExamplesSsaAnalysisBase.
 Import List.ListNotations.
 Local Open Scope nat_scope.
 

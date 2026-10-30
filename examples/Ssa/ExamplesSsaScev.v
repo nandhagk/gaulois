@@ -2,7 +2,7 @@
 
     The count-up program increments a 32-bit header parameter while it is below its entry bound.
     For example, bound five gives the recurrence zero plus the arrival index and trip count five.
-    Builds on: ExamplesSsaAnalyses, ExamplesSsaActivation and AnalysesScev. *)
+    Builds on: ExamplesSsaAnalysisBase, ExamplesSsaActivation and AnalysesScev. *)
 
 From Stdlib Require Import List Bool Arith Lia ZArith NArith.
 From Gaulois.Collections Require Import CollectionsEncoding CollectionsMap.
@@ -12,7 +12,7 @@ From Gaulois.Views Require Import ViewsSemantics ViewsGraph ViewsSsa ViewsDomina
 From Gaulois.Analyses Require Import AnalysesScev.
 From Gaulois.Examples.Ssa Require Import ExamplesSsaSyntax ExamplesSsaTyping ExamplesSsaSemantics
   ExamplesSsaTypingProofs ExamplesSsaBridge ExamplesSsaActivation ExamplesSsaViews ExamplesSsaStrict
-  ExamplesSsaAnalyses.
+  ExamplesSsaAnalysisBase.
 Import List.ListNotations.
 Local Open Scope nat_scope.
 

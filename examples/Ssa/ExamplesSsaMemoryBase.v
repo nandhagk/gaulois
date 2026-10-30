@@ -2,14 +2,14 @@
 
     The client applies historical byte framing to full-program SSA executions.
     For example, an integer byte outside every write summary retains its value across calls.
-    Builds on: ExamplesSsaAnalyses, ExamplesSsaBytes and AnalysesMemoryBase. *)
+    Builds on: ExamplesSsaAnalysisBase, ExamplesSsaBytes and AnalysesMemoryBase. *)
 
 From Stdlib Require Import List ZArith.
 From Gaulois.Domains Require Import DomainsFootprint.
 From Gaulois.Views Require Import ViewsSemantics.
 From Gaulois.Analyses Require Import AnalysesMemoryBase.
 From Gaulois.Examples.Ssa Require Import ExamplesSsaSyntax ExamplesSsaTyping
-  ExamplesSsaSemantics ExamplesSsaAnalyses ExamplesSsaBytes.
+  ExamplesSsaSemantics ExamplesSsaAnalysisBase ExamplesSsaBytes.
 
 Section SsaAnalysisWrappers.
 Context (ext : nat -> list cval -> option cval) (P : program) (lim : limits).

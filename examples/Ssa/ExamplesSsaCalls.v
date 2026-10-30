@@ -2,7 +2,7 @@
 
     These wrappers connect generic call summaries to the actual SSA frame machine.
     For example, call-graph unreachability excludes a function from every active SSA stack.
-    Builds on: ExamplesSsaAnalyses, ExamplesSsaEffects and AnalysesCalls. *)
+    Builds on: ExamplesSsaAnalysisBase, ExamplesSsaEffects and AnalysesCalls. *)
 
 From Stdlib Require Import List.
 From Gaulois.Collections Require Import CollectionsEncoding CollectionsMap.
@@ -12,7 +12,7 @@ From Gaulois.Fixpoint Require Import FixpointSystem.
 From Gaulois.Views Require Import ViewsSemantics ViewsEffects ViewsCalls ViewsSummary.
 From Gaulois.Analyses Require Import AnalysesCalls.
 From Gaulois.Examples.Ssa Require Import ExamplesSsaSyntax ExamplesSsaTyping ExamplesSsaSemantics
-  ExamplesSsaTypingProofs ExamplesSsaEffects ExamplesSsaAnalyses.
+  ExamplesSsaTypingProofs ExamplesSsaEffects ExamplesSsaAnalysisBase.
 Import List.ListNotations.
 
 Lemma calls_ssa_resolver_listed ext P : wf_program ext P ->
