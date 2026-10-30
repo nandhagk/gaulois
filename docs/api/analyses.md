@@ -2063,9 +2063,10 @@ Theorem arg_fact_sound {S O F P V C A} (m : semantics S O) (cv : calls_view S F 
 Proof idea: the resolver law is a case analysis on the three clauses against the three branches of
 `resolver`, with `frames_listed` for the fallback `all`; recursion and reachability from the
 frame-chain invariant of `active_reachable_in_call_graph`; purity by `summary_sound` with
-`purity_cover`; stack demand because the frames above `f` form a path of the call graph out of `f`
-and, when `f` reaches no cycle, a path of the condensation DAG whose weight is bounded by the
-maximum-weight path; the leaf by `step_shape`; call strings by the proof of `summary_sound` with the
+`purity_cover`; for exact stack demand, prove raw paths and cycles correspond to those of the
+target-deduplicated finite graph, reroot it at `f`, and prove both cycle detection directions and
+the attained maximum weight. For stack soundness, use the actual frame path and `stack_demand_exact`;
+the leaf by `step_shape`; call strings by the proof of `summary_sound` with the
 context carried; the index by a fold over the sites; arguments by the call-step law,
 `callers_index_agrees`, the join upper bound and `gamma_monotone`. The resolver in `arg_fact_sound`
 must be the one the call-step law refers to. Card: ANA-8.
