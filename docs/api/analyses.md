@@ -4172,8 +4172,18 @@ must conservatively include the unknown environment or be accompanied by the exp
 effects described by ANA-8c. Do not infer that a list of known functions covers an external call.
 Test self and mutual recursion with a base case, disconnected components, multiple callers,
 duplicate targets and unresolved calls. The retained ANA-8 bounded call strings are unchanged.
-For malformed graphs, the total function falls back to the existing total joining solver; its
-advertised SCC guarantees above are stated only under `graph_wf`.
+Before either solver, check the finite listed call graph using the function encoding. The check
+accepts exactly when `functions cv` has no duplicates, every root is listed, and for every listed
+function `f`, site `p` in `sites_of cv f`, and `g` in `resolve p`, both `caller_of cv p = f` and
+`g` is listed. An empty target list creates no edge and imposes no caller test. Build membership
+indexes once and reuse prepared targets; do not scan lists inside solver loops. Prove this finite
+check accepts whenever `graph_wf (call_graph cv resolve)` holds. It does not decide that global
+predicate: it makes no observation of outgoing edges at unlisted functions.
+
+If the finite check rejects, `solve_scc_summaries` returns the existing total joining solver on
+the original `summary_system` and its static dependencies. If it accepts, use the specified
+indexed SCC engine. The advertised SCC guarantees above are stated under full raw `graph_wf`;
+no additional global malformed-graph fallback is specified when the finite check accepts.
 
 Build the reachable `(function, bounded-call-string)` graph from roots once, and solve its
 dependency-closed equations with the finite-height SCC engine. Each reachable context's
@@ -4182,12 +4192,18 @@ with a least solution of the existing system. Return bottom for contexts outside
 argument facts in one pass over indexed callers, preserving the original fold order and duplicates,
 then use indexed function/position lookups; equality needs no commutativity or associativity.
 The argument map must satisfy its explicit map invariant; the prepared callers map proves it.
-On malformed input `solve_reachable_callstrings` returns bottom everywhere; its agreement theorem
-requires `graph_wf`.
+If the finite listed check rejects, `solve_reachable_callstrings` returns bottom everywhere. If
+it accepts, use the specified reachable-context construction and solver, including bottom outside
+that graph. No additional global malformed-graph fallback is specified when the check accepts.
+Its agreement theorem requires full raw `graph_wf`.
 The retained `callstring_system` enumerates the finite contexts of length at most `k` whose sites
 occur in the view, including the empty context. Unreachable such contexts remain in its equations;
-the reachable solver omits them. Test `k = 0`, duplicate sites and target lists, and a malformed
-caller/site association that takes the generic fallback.
+the reachable solver omits them. Test `k = 0`, duplicate sites and target lists, and a listed
+caller/site mismatch with a nonempty target list: it takes the generic summary fallback and yields
+bottom everywhere for reachable call strings. Test duplicate functions, an unlisted root and an
+unlisted resolved target independently. Test an empty-resolver site with a mismatched caller,
+which passes this check, and the preserved hidden off-list-edge pair, which also passes it. On a
+rejected case compare the summary result with the selected generic solver on the original system.
 
 
 
