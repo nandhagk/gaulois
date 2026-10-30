@@ -1034,7 +1034,9 @@ a byte changes only by a store, an allocation or a free, whose `writes_at` cover
 offset (`byte_frame`); `allocation_size_in_range` bounds each allocated block below 2^64; an
 allocation zero-fills its block and a block that exists is
 changed only by a store or a free, whose footprints cover it (`z_fresh`, `z_kept`; a freed block
-reads as no byte). Card: EX-6 for `ssa_full_view_laws` and `ssa_mem_laws`; ANA-9 for
+reads as no byte). For `z_address`, a `VPtr` retains its block number and offset, and an existing
+block has a site that `ssa_mem_laws` preserves, including after free. Card: EX-6 for
+`ssa_full_view_laws` and `ssa_mem_laws`; ANA-9 for
 `ssa_ptr_laws` and `ssa_zero_laws`; ANA-10a for `ssa_bytes_laws`.
 
 ```coq

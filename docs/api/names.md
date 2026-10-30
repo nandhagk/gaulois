@@ -2592,7 +2592,7 @@ ANA-3 owns the remaining declarations in this file.
 - `write_universe` — Definition; Finite footprint universe for zero-byte facts.
 - `written_set` — Definition; Finite set of written footprints.
 - `zero_written_system` — Definition; Forward constraints tracking footprints written since entry.
-- `zero_laws` — Record; Fresh-zero and unwritten-byte preservation laws.
+- `zero_laws`, `z_address` — Record, field; zero-byte laws and retained pointer address transport.
 - `z_view` — Field; Graph view underlying zero-byte analysis.
 - `z_no_stays` — Field; The zero-byte graph has no point-preserving steps.
 - `z_init` — Field; Initial existing blocks satisfy the zero-byte condition.
