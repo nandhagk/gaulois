@@ -1103,7 +1103,7 @@ Contract: [Examples](examples.md).
   `gvn_use_observation_laws`, `gvn_use_witness`, `gvn_use_equal` — ANA-5 dominated-use client.
 - `gvn_loop_prog`, `gvn_loop_problem`, `gvn_loop_info`, `gvn_loop_value` — ANA-5 loop client.
 - `gvn_loop_laws`, `gvn_loop_wf`, `gvn_loop_invariant`, `gvn_loop_stability`, `gvn_loop_run`,
-  `gvn_loop_sound` — ANA-5 loop evidence and application.
+  `gvn_loop_recomputed`, `gvn_loop_sound` — ANA-5 loop evidence and application.
 - `count_up`, `count_up_n`, `count_up_chrec`, `count_up_inv` — Definitions; ANA-7 recurrence
   fixture.
 - `chain_graph`, `chain_writes`, `chain_writes_clobber`, `chain_reads`, `chain_ssa` — Definitions;

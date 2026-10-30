@@ -1292,6 +1292,20 @@ Theorem gvn_loop_run : exists s tr t,
   exec_in (activation (fun _ _ => None) gvn_loop_prog 0)
     (fun u => body gvn_loop_info (point (base (nsv gvn_loop_problem)) u) = true) s tr t /\
   s <> t.
+Theorem gvn_loop_recomputed : exists a b c d tr o args,
+  reachable_state (activation (fun _ _ => None) gvn_loop_prog 0) a /\
+  def (nsv gvn_loop_problem) gvn_loop_value = Op o args /\
+  at_instr gvn_loop_prog (activation_frame 0 a) (IOp gvn_loop_value o args) /\
+  step (activation (fun _ _ => None) gvn_loop_prog 0) a [] b /\
+  val (nsv gvn_loop_problem) a gvn_loop_value <>
+    val (nsv gvn_loop_problem) b gvn_loop_value /\
+  exec_in (activation (fun _ _ => None) gvn_loop_prog 0)
+    (fun u => body gvn_loop_info (point (base (nsv gvn_loop_problem)) u) = true) b tr c /\
+  at_instr gvn_loop_prog (activation_frame 0 c) (IOp gvn_loop_value o args) /\
+  step (activation (fun _ _ => None) gvn_loop_prog 0) c [] d /\
+  body gvn_loop_info (point (base (nsv gvn_loop_problem)) a) = true /\
+  body gvn_loop_info (point (base (nsv gvn_loop_problem)) d) = true /\
+  val (nsv gvn_loop_problem) c gvn_loop_value = val (nsv gvn_loop_problem) d gvn_loop_value.
 Theorem gvn_loop_sound : forall s tr1 u1 tr2 u2 tr3 u3,
   reachable_state (activation (fun _ _ => None) gvn_loop_prog 0) s ->
   exec_in (activation (fun _ _ => None) gvn_loop_prog 0)
