@@ -1100,6 +1100,13 @@ Record zero_laws {S O N E V C L T} (m : semantics S O) (gv : graph_view S O N E)
   z_fresh : forall s l s' e c l0 t n, reachable_state m s -> step m s l s' -> taken gv s l s' e ->
     loc_of (pmem pv) s c = None -> loc_of (pmem pv) s' c = Some l0 ->
     loc_site (pmem pv) s' l0 = Some t -> pbyte pv s' c = Some n -> n = 0;
+  (* an existing pointer's post-step address has the same site and offset before the step *)
+  z_address : forall s l s' e c l0 l1 t,
+    reachable_state m s -> step m s l s' -> taken gv s l s' e ->
+    loc_of (pmem pv) s c = Some l0 -> loc_of (pmem pv) s' c = Some l1 ->
+    loc_site (pmem pv) s' l1 = Some t ->
+    loc_site (pmem pv) s l0 = Some t /\
+    loc_offset (pmem pv) s c = loc_offset (pmem pv) s' c;
   (* a byte that the edge may not write keeps a zero value *)
   z_kept : forall s l s' e c l0 t, reachable_state m s -> step m s l s' -> taken gv s l s' e ->
     loc_of (pmem pv) s c = Some l0 -> loc_site (pmem pv) s l0 = Some t ->
@@ -2007,7 +2014,10 @@ and termination are `monotone_query` of each right-hand side and `finite_powerse
 second and third follow the same unification argument as the least solution; escape is closure of
 the least set; zero bytes by `forward_invariant_sound` with the concretisation "a byte of an
 existing block outside the covered footprints reads zero when readable", using `z_init`, `z_fresh`
-for a block that the step creates and `z_kept` for the others. Card: ANA-9.
+when the pointer has no prior allocation and `z_kept` otherwise. `z_address` transports the
+post-step site and offset to the same pointer's pre-step witness. The post-solution bounds both
+the prior fact and the taken edge's footprints, so an uncovered post address is uncovered in
+each. Card: ANA-9.
 
 ### ANA-10a and ANA-10e
 
