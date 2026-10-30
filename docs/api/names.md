@@ -1101,6 +1101,9 @@ Contract: [Examples](examples.md).
   `gvn_binding_witness`, `gvn_binding_home_dominates`, `gvn_binding_equal` — ANA-5 binding client.
 - `gvn_use_prog`, `gvn_use_problem`, `gvn_use_state`, `gvn_use_observation`,
   `gvn_use_observation_laws`, `gvn_use_witness`, `gvn_use_equal` — ANA-5 dominated-use client.
+- `gvn_phi_prog`, `gvn_phi_problem`, `gvn_phi_left`, `gvn_phi_right`, `gvn_phi_observation`,
+  `gvn_phi_observation_laws`, `gvn_phi_checked`, `gvn_phi_witness`, `gvn_phi_equal` — ANA-5
+  cyclic parameter client and finite history.
 - `gvn_loop_prog`, `gvn_loop_problem`, `gvn_loop_info`, `gvn_loop_value` — ANA-5 loop client.
 - `gvn_loop_laws`, `gvn_loop_wf`, `gvn_loop_invariant`, `gvn_loop_stability`, `gvn_loop_run`,
   `gvn_loop_recomputed`, `gvn_loop_sound` — ANA-5 loop evidence and application.

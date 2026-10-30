@@ -1275,6 +1275,58 @@ Theorem gvn_use_equal :
   exists c, val (nsv gvn_use_problem) gvn_use_state gvn_first = Some c /\
     val (nsv gvn_use_problem) gvn_use_state gvn_second = Some c.
 (* ANA-5 proves the independent witness and applies numbering_use_sound for gvn_use_equal. *)
+Definition gvn_phi_prog : program.
+Definition gvn_phi_problem : numbering_problem astate event label ssa_edge vid sop cval.
+Definition gvn_phi_left : vid.
+Definition gvn_phi_right : vid.
+Definition gvn_phi_observation : numbering_observation nat astate label ssa_edge vid.
+(* The entry edge supplies the same seed to both parameters of block 1. The back edge supplies
+   those two parameters themselves. A separate condition enters the loop and then exits to a
+   distinct dominated use block after a back edge. The adapter uses this program's block view,
+   its values_of inventory and the same pure predicate as gvn_problem. *)
+Theorem gvn_phi_observation_laws :
+  numbering_observation_laws (activation (fun _ _ => None) gvn_phi_prog 0)
+    gvn_phi_problem gvn_phi_observation.
+Theorem gvn_phi_checked : numbering_check label_encoding var_encoding sop_encoding
+  gvn_phi_problem
+  (optimistic_numbering label_encoding var_encoding sop_encoding gvn_phi_problem) = true.
+Theorem gvn_phi_witness : exists h h' h'' e entry c d,
+  def (nsv gvn_phi_problem) gvn_phi_left = Param 1 0 /\
+  def (nsv gvn_phi_problem) gvn_phi_right = Param 1 1 /\
+  observation_previous gvn_phi_observation h 1 = Some (e, h') /\
+  observation_previous gvn_phi_observation h' 1 = Some (entry, h'') /\ e <> entry /\
+  (exists seed, nth_error (edge_args (nsv gvn_phi_problem) entry) 0 = Some seed /\
+    nth_error (edge_args (nsv gvn_phi_problem) entry) 1 = Some seed) /\
+  nth_error (edge_args (nsv gvn_phi_problem) e) 0 = Some gvn_phi_left /\
+  nth_error (edge_args (nsv gvn_phi_problem) e) 1 = Some gvn_phi_right /\
+  observation_ready gvn_phi_observation h gvn_phi_left /\
+  observation_ready gvn_phi_observation h gvn_phi_right /\
+  observation_ready gvn_phi_observation h' gvn_phi_left /\
+  observation_ready gvn_phi_observation h' gvn_phi_right /\
+  observation_rank gvn_phi_observation h' gvn_phi_left <
+    observation_rank gvn_phi_observation h gvn_phi_left /\
+  observation_rank gvn_phi_observation h' gvn_phi_right <
+    observation_rank gvn_phi_observation h gvn_phi_right /\
+  reachable_state (activation (fun _ _ => None) gvn_phi_prog 0)
+    (observation_state gvn_phi_observation h) /\
+  strictly_dominates (cfg (base (nsv gvn_phi_problem))) 1
+    (point (base (nsv gvn_phi_problem)) (observation_state gvn_phi_observation h)) /\
+  val (nsv gvn_phi_problem) (observation_state gvn_phi_observation h) gvn_phi_left = Some c /\
+  val (nsv gvn_phi_problem) (observation_state gvn_phi_observation h) gvn_phi_right = Some d /\
+  optimistic_numbering label_encoding var_encoding sop_encoding gvn_phi_problem gvn_phi_left =
+    optimistic_numbering label_encoding var_encoding sop_encoding gvn_phi_problem gvn_phi_right.
+Theorem gvn_phi_equal : forall h c d,
+  observation_ready gvn_phi_observation h gvn_phi_left ->
+  observation_ready gvn_phi_observation h gvn_phi_right ->
+  reachable_state (activation (fun _ _ => None) gvn_phi_prog 0)
+    (observation_state gvn_phi_observation h) ->
+  strictly_dominates (cfg (base (nsv gvn_phi_problem))) 1
+    (point (base (nsv gvn_phi_problem)) (observation_state gvn_phi_observation h)) ->
+  val (nsv gvn_phi_problem) (observation_state gvn_phi_observation h) gvn_phi_left = Some c ->
+  val (nsv gvn_phi_problem) (observation_state gvn_phi_observation h) gvn_phi_right = Some d ->
+  c = d.
+(* ANA-5 proves the independent value witnesses, actual incoming-edge history and checker
+   acceptance, then derives equality using the generic theorem. *)
 Definition gvn_loop_prog : program.
 Definition gvn_loop_problem : numbering_problem astate event label ssa_edge vid sop cval.
 Definition gvn_loop_info : loop_info label.
