@@ -2675,13 +2675,16 @@ ANA-3 owns the remaining declarations in this file.
 - `overwrites` — Field; Byte ranges overwritten by an edge.
 - `mreads` — Field; Byte ranges read by an edge.
 - `sagree` — Field; State agreement for the store analysis.
+- `store_boundary` — Field; Prepared canonical boundary fact for each graph node.
 - `dead_store_transfer` — Definition; Backward transfer for byte ranges covered by later writes.
 - `dead_store_system` — Definition; Backward constraints for dead-store coverage.
+- `dead_store_reached` — Definition; Listed-node assignments are reached.
 - `store_laws` — Record; Step and ending laws for dead-store agreement.
 - `s_view` — Field; The store graph view satisfies its laws.
 - `s_no_stays` — Field; The store graph has no point-preserving steps.
 - `s_agreement` — Field; The store relation satisfies agreement laws.
-- `s_step` — Field; Store agreement is preserved by matching steps.
+- `s_terminal_boundary` — Field; Actual ending points have an empty boundary.
+- `s_step` — Field; Store agreement is preserved by matching steps on reached assignments.
 - `s_ends` — Field; Store agreement preserves observable endings.
 - `bytes_view` — Record; Allocation sites, bytes and node write footprints.
 - `BytesView` — Constructor; Constructs the bytes view record.

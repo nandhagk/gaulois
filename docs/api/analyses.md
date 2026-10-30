@@ -1527,23 +1527,43 @@ Record store_view (S O N E T : Type) (ET : encoding T) : Type := StoreView {
   sgraph : graph_view S O N E;
   overwrites : E -> list (footprint T);
   mreads : E -> list (footprint T);
-  sagree : agreement (range_must ET) S
+  sagree : agreement (range_must ET) S;
+  store_boundary : N -> canonical_footprints ET
 }.
 Definition dead_store_transfer {S O N E T} (ET : encoding T) (sv : store_view S O N E T ET) (e : E)
     (a : range_must ET) : range_must ET :=
-  range_add ET (overwrites sv e) (range_remove ET (mreads sv e) a).
+  range_remove ET (mreads sv e) (range_add ET (overwrites sv e) a).
 Definition dead_store_system {S O N E T} (ET : encoding T) (sv : store_view S O N E T ET) :
   System.t N (dense_constraint N E) (range_must ET) :=
-  backward_system (cfg (sgraph sv)) (fun _ => range_reached ET nil) (dead_store_transfer ET sv).
+  backward_system (cfg (sgraph sv))
+    (fun n => Reached (store_boundary sv n)) (dead_store_transfer ET sv).
+Definition dead_store_reached {S O N E T} (ET : encoding T)
+    (sv : store_view S O N E T ET) (sigma : N -> range_must ET) : Prop :=
+  forall n, In n (Graph.nodes (cfg (sgraph sv))) -> sigma n <> Unreached.
 Record store_laws {S O N E T} (m : semantics S O) (en : endings S) (ET : encoding T)
     (sv : store_view S O N E T ET) : Prop := {
   s_view : graph_view_laws m (sgraph sv);
   s_no_stays : forall s l s', ~ stays (sgraph sv) s l s';
   s_agreement : agreement_laws (range_must_lattice ET) (sagree sv) /\ agreement_symmetric (sagree sv);
-  s_step : step_agrees m (sgraph sv) (sagree sv) (reachable_state m) (dead_store_transfer ET sv);
+  s_terminal_boundary : forall s k, reachable_state m s -> ends_as m en k s ->
+    leb (range_must_lattice ET) (range_reached ET nil)
+      (Reached (store_boundary sv (point (sgraph sv) s))) = true;
+  s_step : forall sigma, dead_store_reached ET sv sigma ->
+    step_agrees m (sgraph sv) (sagree sv) (reachable_state m)
+      (dead_store_transfer ET sv) sigma;
   s_ends : ends_agree m en (sgraph sv) (sagree sv) (reachable_state m)
-    (fun _ => range_reached ET nil)
+    (fun n => Reached (store_boundary sv n))
 }.
+(* The boundary is a prepared canonical fact. Prepare any needed node index once. At every
+   reachable final, trap, stop or stuck point it has no covered bytes. A finite useful client
+   may seed internal nodes with the canonical union of listed-edge overwrites and terminal
+   nodes with the empty list, using a sound may-end classifier. `s_ends` applies to that
+   actual boundary at all reachable points. `s_step` applies to every assignment reached at
+   listed nodes; the post-solution seed inequalities imply this premise. Reads take priority
+   over overlapping overwrites and cover old-byte dependencies, including control, traps,
+   events and escapes. Clients prove the local laws for their actual semantics. At an actual
+   ending, a post-solution and terminal boundary law give empty-range `sagree`; complete
+   memory equality follows only for clients whose agreement has that concrete meaning. *)
 (* Bytes: what a node may write, and the byte at an offset of an allocation. A write is anything
    that changes a byte: a store, an allocation (which creates its bytes), a free (which removes
    them) and every write of a callee. *)
