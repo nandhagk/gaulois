@@ -1,0 +1,15 @@
+(rocq.theory
+ (name Gaulois.Float)
+ (flags :standard -w +default)
+ (theories
+  Stdlib
+  Flocq
+  Gaulois.Collections
+  Gaulois.Order
+  Gaulois.Graph
+  Gaulois.Bits
+  Gaulois.Fixpoint
+  Gaulois.Domains
+  Gaulois.Views
+  Gaulois.Analyses
+  Gaulois.Examples))
