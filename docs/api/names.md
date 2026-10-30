@@ -3104,6 +3104,9 @@ REW-7 owns the independent Order, SSA and word clients.
 
 ### `AnalysesSsaLiveQuery.v` — ANA-12
 
+- `general_live_query` — Definition; General-graph liveness query from prepared Rules rows.
+- `general_live_query_exact` — Theorem; Exact on listed nodes of a well-formed graph.
+
 - `reduced_path` — public declaration; see the owning API contract.
 - `rt_step` — public declaration; see the owning API contract.
 - `rt_reaches` — public declaration; see the owning API contract.

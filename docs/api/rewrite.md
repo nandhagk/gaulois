@@ -10,6 +10,8 @@ The public contract is organized by implementation card. Definitions written wit
 body specify an executable function; the accompanying equations and theorem statements fix its
 meaning. A theorem is a proof obligation, not evidence of a proof. All core theorems are closed
 under the global context. Dictionaries are parameterized records, without carrier `Type` fields.
+At commit `3281819`, REW-1 through REW-7 and ANA-6 have landed. Their reports and independent
+reviews record checked claims and finite examples under the stated premises.
 
 ## Files
 
@@ -256,7 +258,7 @@ Definition rw_rebuild {K Sort V} (EK : encoding K) (ES : encoding Sort) (EV : en
 
 `rw_add` interns every node of the finite term, allocates missing classes, and returns its class.
 `rw_union` returns `None` for an unallocated identifier or different class sorts; otherwise it
-merges exactly the requested classes and marks affected parents dirty. `rw_rebuild` canonicalizes
+merges exactly the requested classes. `rw_rebuild` canonicalizes
 children and repeatedly merges congruent parents until clean. It may add equalities but no new
 term node; it terminates on every finite well-formed graph. Existing class identifiers remain
 valid. Neither operation silently authorizes an arbitrary semantic equality: preservation requires
@@ -270,6 +272,9 @@ Both updates deduplicate node identifiers; node changes account for repeated chi
 child aliases resolving to the same root before removing or reinserting the parent.
 Rebuild initializes the index once and maintains these invariants after every such change; this
 includes parents that still contain a noncanonical child alias.
+Rebuild keeps dirty congruence obligations in a local indexed pair worklist, not a public graph
+field. A finite binary credit bounds the iteration; the prepared pair universe can be quadratic
+within an operator bucket. This observation is not a complexity theorem or measurement.
 
 ```coq
 Theorem rw_empty_wf {K Sort V} (sig : rw_signature K Sort V) : rw_graph_wf sig rw_empty.

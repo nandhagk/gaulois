@@ -19,6 +19,13 @@ proof or benchmark. The interval threshold tree can have linear height for sorte
 inputs, so its lookup is not claimed to be logarithmic. Consult the individual contracts and
 reports for the costs and evidence of each component.
 
+SSA liveness queries account for preparation, trie paths, use scans and returned data. Sparse
+evaluation graphs charge construction and solver work separately from prefix and suffix
+reconstruction at a query. PRE charges family and graph setup, translation callbacks, indexed
+phi operands, reset phases and materialized output; its conservative bounds are not a tight
+complexity theorem or an optimality claim. Structured liveness also charges universe filtering
+and materialized table rows. These descriptions are source-level accounting, not benchmarks.
+
 The extraction check scans the selected generated artifacts for `Obj.magic` and the Rules solver
 closure for proof-only finite-universe enumeration. Clients select extraction realisations outside
 theories. The benchmark measures extracted trie, graph, solver and Rules workloads over generated

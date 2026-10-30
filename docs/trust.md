@@ -5,13 +5,32 @@ proved theorem whose assumptions meet the policy below. A statement that compile
 it does not establish a proof. A smoke check reports an outcome on examples. An experiment reports
 measurements and does not prove a general complexity or soundness claim.
 
-At commit `f8f35c8` on 2026-10-29, M2 is reached. Landed card reports and independent reviews
+At commit `dce00e5` on 2026-10-30, M2, M3 and M7 are reached. Landed reports and reviews
 record targeted builds, examples, checks and assumption audits for their assigned claims. EX-4's
 report records 123 closed assumption checks and computed While examples; its review independently
 observed the repository check pass and inspected the worker's build and test evidence. These are
 incremental checks, not a fresh full build. They establish claims under their stated premises, not
 unimplemented contracts. The API documents are specifications and have not been compiled as a
 whole. FINAL is planned to check a fresh full build.
+
+At commit `3281819`, M7's Rewrite cards and the ANA-6 facade have landed. Their reports and
+independent reviews record targeted builds, checks, closed claims and computed examples. REW-7's
+review reruns its targeted build and repository check and inspects the worker's test and audit
+evidence. These are incremental checks, not a fresh proof replay for the entire library.
+
+The facade can return `None` when it cannot produce an accepted explanation for the selected
+minimum tree. Finite scheduling does not establish fairness or saturation completeness. The
+extractor's optimum is for materialized additive tree cost, not shared-DAG or program cost.
+The SSA region proof covers a pure expression; whole-program replacement also needs the stated
+client bisimulation law. Order facts permit undefined results; nonzero facts require validation.
+
+ANA-15's accepted review reruns its targeted build and repository check and inspects the final
+630-root closed-context audit. Its source-frame diagnostic uses a manual legal plan and an actual
+FRG link; it does not instantiate the formerly absent producer. The delayed-choice diagnostic
+refutes the superseded stuttering method, not the behavior theorem. The completed proof instead
+uses actual complete paths under the stated laws. The three owned files have 4,614, 1,770 and
+2,754 lines; fixed ownership overrides the skill's file-size guidance. These checks do not prove
+PRE optimality or extracted runtime correspondence.
 
 ## Assumptions
 

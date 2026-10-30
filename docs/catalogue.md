@@ -4,11 +4,11 @@ The catalogue describes the intended scope, including work not yet implemented. 
 `api/` specify definitions and claims; cards assign implementation and verification work. A
 catalogue entry may compose several shared domains, views, solvers and checkers.
 
-At commit `f8f35c8` on 2026-10-29, M2's engines, views and toys cards have landed, as have
-additional domains, dense dataflow, demand and sparse available/busy evaluation graphs. The While
-client exercises dense analyses. Individual landed cards report checked claims and examples; the
-remaining entries and compositions, including MemorySSA and Ssa analysis clients, are not implied
-to be complete. The run ledger is the current card-by-card status.
+At commit `dce00e5` on 2026-10-30, M2, M3 and M7 have landed. Their scope includes SSA numeric
+values, liveness queries, sparse evaluation graphs, PRE and the Rewrite core and facade.
+Andersen points-to has also landed. Individual cards report checked claims and examples; the
+remaining entries and compositions, including MemorySSA, are not implied to be complete.
+The run ledger is the current card-by-card status.
 
 - **Graph:** reachability, RPO, merge nodes, selectable LT and Semi-NCA dominators and
   post-dominators, frontiers, control dependence, SCCs, loops, WTO, reducibility, forwarding

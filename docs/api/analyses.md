@@ -8,6 +8,10 @@ theorem says that two runs from states that agree on the live-in set behave the 
 language whose `uses` and `defs` are honest. No toy-language content lives here: `Examples`
 instantiates every entry.
 
+At commit `dce00e5`, M3's assigned analyses have landed. Their claims retain the displayed
+client laws, readiness and solution premises. ANA-9a's Andersen producer has also landed;
+other catalogue entries remain specifications until their cards land.
+
 Conventions, in addition to those of `views.md`:
 - Every analysis has a system builder (`<name>_system`, a `system` as in `FixpointSystem.v`) and a
   soundness theorem that quantifies over any `sigma` with `post_solution L (<name>_system ...)
@@ -432,7 +436,7 @@ Definition sparse_of_numeric {A K C} (ND : numeric_domain A) (G : concretisation
 Definition numeric_problem {S O N E V K C A} (ND : numeric_domain A) (G : concretisation A word)
     (br : op_bridge K C) (top : A) (sv : ssa_view S O N E V K C) (vals : list V)
     (entry : V -> A) : sparse_problem S O N E V K C A :=
-  SparseProblem S O N E V K C A sv (sparse_of_numeric ND G br top) vals entry.
+  @SparseProblem S O N E V K C A sv (sparse_of_numeric ND G br top) vals entry.
 (* SCCP, known bits, wrapping intervals, bits x interval and interval x congruence are
    numeric_problem with the numeric_domain of DOM-1 (constants), DOM-2, DOM-3 and DOM-4 (the
    reduced products), each with its numeric_laws; the width plumbing is `tagged_domain`. *)
@@ -445,7 +449,8 @@ Definition numeric_problem {S O N E V K C A} (ND : numeric_domain A) (G : concre
    view has pending slots and different uses and defs, although both views share a graph.
    Source-variable liveness at raw points transfers only by ssa_refined_liveness. Semantic
    conclusions use the original semantic variable-view laws; intermediate facts and sets over
-   the different variable carriers are not identified. *)
+   the different variable carriers are not identified. The SSA SCCP initial invariant accounts
+   for both entry seeds and initial Arbitrary parameters at a call continuation. *)
 Definition solve_values {S O N E V K C A} (pr : sparse_problem S O N E V K C A)
     (EN : encoding N) (EE : encoding E) (EV : encoding V)
     (HL : lattice_laws (lift_bot_lattice (fact_lat (domain pr))))
@@ -468,9 +473,12 @@ Definition solve_values {S O N E V K C A} (pr : sparse_problem S O N E V K C A)
 (* AnalysesPaths.v. Edge predicates (Ranger style) are VIEW-5's `refined_fact`: the fact for a
    value as read in a block, refined by the guards of every dominating edge; Analyses adds no
    second definition. Path facts: a bounded disjunction (`disjunction_lattice` of Order) of facts,
-   one disjunct per way of reaching the point, merged beyond k disjuncts. *)
+   one disjunct per way of reaching the point, merged beyond k disjuncts. Forward transfer
+   enumerates alternatives; guards map them; inverse transfer joins each operand, refines it
+   and returns singleton alternatives. The compact operation supplies one summary at cap zero. *)
 Definition path_domain {A C K} (k : nat) (D : sparse_domain A C K) :
-  sparse_domain (list A) C K.   (* over disjunction_lattice k (lat D); conc = disjunction_gamma *)
+  sparse_domain (list A) C K.
+(* over disjunction_lattice k (fact_lat D); conc = disjunction_gamma *)
 (* Guard chains: the guards that hold at a block, outermost first. *)
 Definition guard_chain {S O N E V K C} (sv : ssa_view S O N E V K C) (EN : encoding N)
     (b : N) : list (condition V C) :=
@@ -2379,6 +2387,8 @@ Theorem ssa_live_query_rules {B BE S O N E V C} (EN : encoding N) (EE : encoding
 `live_index_get` is the default-empty `Map.get` helper owned by ANA-12. A separate general-graph
 producer answers unreachable or non-strict input, and
 is not included in `ssa_live_query_exact`. The SSA specialization only claims reachable input.
+The implemented `general_live_query` uses prepared Rules rows; `general_live_query_exact`
+covers every listed node of a well-formed graph, including unreachable and non-strict points.
 The client can select the general producer for other points. The declarations do not assert
 that unreachable points are dead. Dominance and R/T remain exact on irreducible reachable CFGs.
 

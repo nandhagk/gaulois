@@ -32,15 +32,14 @@ contracts are in [docs/api](docs/api/), with a [name index](docs/api/names.md). 
 
 ## Status
 
-At commit `f8f35c8` on 2026-10-29, the engines, views and toys milestone M2 is reached: all
-cards assigned to it have landed. Foundations, Graph, Fixpoint, domain components, stratified
-Rules solving and the Rewrite core through finite witness extraction are present. Landed analyses
-include dense dataflow, demand and sparse available/busy evaluation graphs. The While client has
-view proofs and dense analysis examples; the Ssa language is present, while its analysis clients
-remain in progress or planned. Typed extraction and a benchmark harness have landed.
+At commit `dce00e5` on 2026-10-30, milestones M2, M3 and M7 are reached. Foundations, Graph,
+Fixpoint, domain components, stratified Rules solving and REW-1 through REW-7 with the ANA-6
+facade have landed. Analyses include dense and sparse dataflow, numeric SSA values, SSA liveness
+queries, sparse evaluation graphs, SSA PRE and Andersen points-to. The While and Ssa clients
+exercise landed analyses. Typed extraction and a benchmark harness have landed.
 
-The snapshot has 71 of 100 cards landed. MemorySSA constructors, advanced analyses, remaining
-clients and Float remain pending. Landed cards report kernel-checked claims and computed examples
+The snapshot has 85 of 100 cards landed. GVN, calls, memory and remaining clients are queued;
+optional Float is under independent review. Landed cards report kernel-checked claims and examples
 for their assigned contracts; they do not establish the whole library. See
 [catalogue](docs/catalogue.md) for scope and [trust](docs/trust.md) for evidence. Contracts not yet
 implemented are specifications, not compiled interfaces.
