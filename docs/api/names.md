@@ -1097,6 +1097,13 @@ Contract: [Examples](examples.md).
 - `ssa_immutable_sound` — Theorem; ANA-10a preservation of unwritten bytes.
 - `factorial_ssa`, `z_value`, `p_value`, `loop_header_point` — Definitions; EX-5a factorial fixture.
 - `gvn_prog`, `gvn_first`, `gvn_second`, `gvn_problem` — Definitions; ANA-5 numbering fixture.
+- `gvn_binding_state`, `gvn_binding_observation`, `gvn_binding_observation_laws`,
+  `gvn_binding_witness`, `gvn_binding_home_dominates`, `gvn_binding_equal` — ANA-5 binding client.
+- `gvn_use_prog`, `gvn_use_problem`, `gvn_use_state`, `gvn_use_observation`,
+  `gvn_use_observation_laws`, `gvn_use_witness`, `gvn_use_equal` — ANA-5 dominated-use client.
+- `gvn_loop_prog`, `gvn_loop_problem`, `gvn_loop_info`, `gvn_loop_value` — ANA-5 loop client.
+- `gvn_loop_laws`, `gvn_loop_wf`, `gvn_loop_invariant`, `gvn_loop_stability`, `gvn_loop_run`,
+  `gvn_loop_sound` — ANA-5 loop evidence and application.
 - `count_up`, `count_up_n`, `count_up_chrec`, `count_up_inv` — Definitions; ANA-7 recurrence
   fixture.
 - `chain_graph`, `chain_writes`, `chain_writes_clobber`, `chain_reads`, `chain_ssa` — Definitions;
@@ -2369,6 +2376,16 @@ ANA-3 owns the remaining declarations in this file.
 - `dominator_numbering` — Definition; Computes scoped value numbers along the dominator tree.
 - `optimistic_numbering` — Definition; Refines a partition to compute optimistic value numbers.
 - `numbering_check` — Definition; Checks a proposed value numbering.
+- `numbering_observation` — Record; States, ready values, ranks and shared predecessor contexts.
+- `NumberingObservation` — Constructor; Constructs an observation dictionary.
+- `observation_state`, `observation_ready`, `observation_rank`, `observation_previous` — Fields;
+  Relate observations, readiness, ranks and shared predecessor contexts.
+- `numbering_observation_laws` — Record; Local operation and historical parameter equations.
+- `NumberingObservationLaws` — Constructor; Constructs the local observation laws.
+- `observed_op`, `observed_param` — Fields; Operation and shared incoming-parameter evidence.
+- `numbering_loop_laws` — Record; Pure-operation binding behavior for loop soundness.
+- `NumberingLoopLaws` — Constructor; Constructs the loop binding laws.
+- `loop_op_binding` — Field; A changed pure operation binds a computed result.
 - `loop_info` — Record; Header and membership predicate for a loop.
 - `LoopInfo` — Constructor; Constructs the loop info record.
 - `header` — Field; Header of a loop.
@@ -2378,6 +2395,7 @@ ANA-3 owns the remaining declarations in this file.
 - `header_dominates` — Field; The loop header dominates every body node.
 - `single_entry` — Field; Every entry into the loop body passes through its header.
 - `invariant_in` — Definition; Inductive loop-invariance predicate for a value.
+- `loop_operands_stable` — Definition; Direct operands stay fixed during the selected loop run.
 - `numbering_check_sound` — Theorem; Accepted value numbering relates equal values at valid uses.
 - `numbering_use_sound` — Theorem; Equal numbers imply equal values at a dominated use.
 - `dominator_numbering_checked` — Theorem; Dominator-scoped numbering passes the numbering checker.

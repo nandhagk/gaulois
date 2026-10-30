@@ -1082,7 +1082,8 @@ and
 
 Other analyses use their named generic theorem with the applicable view and its laws. In
 particular, `numeric_value_sound` takes a numeric domain, `ssa_bridge` and `ssa_block_view`;
-`numbering_use_sound` and `loop_invariant_sound` take `ssa_block_view` and `ssa_strict_laws`;
+`numbering_use_sound` and `loop_invariant_sound` take `ssa_block_view`, `ssa_strict_laws` and
+their explicit numbering-specific observation or loop premises;
 `optimise_sound` takes an operator evaluator and rewrite laws; `scev_sound` and `loop_trip_sound`
 take the corresponding recurrence and loop premises. Call, pointer and byte analyses use
 `ssa_calls_laws`, `ssa_ptr_laws` and `ssa_bytes_laws` where their generic theorem requires them.
@@ -1224,10 +1225,93 @@ Definition gvn_second : vid := 3.
 Definition gvn_problem : numbering_problem astate event label ssa_edge vid sop cval.
 (* nsv = ssa_block_view (fun _ _ => None) gvn_prog 0; pure o = false exactly for OExt _;
    nvalues = values_of gvn_prog 0 *)
+Definition gvn_binding_state : astate.
+Definition gvn_binding_observation : numbering_observation unit astate label ssa_edge vid.
+Theorem gvn_binding_observation_laws :
+  numbering_observation_laws (activation (fun _ _ => None) gvn_prog 0)
+    gvn_problem gvn_binding_observation.
+(* The context has the concrete state just after s2 = a + b with both entry arguments zero.
+   Its ready values are a, b, s1 and s2; the arguments have rank zero and the Ops rank one. *)
+Theorem gvn_binding_witness :
+  observation_state gvn_binding_observation tt = gvn_binding_state /\
+  observation_ready gvn_binding_observation tt gvn_first /\
+  observation_ready gvn_binding_observation tt gvn_second /\
+  exists s l c d, reachable_state (activation (fun _ _ => None) gvn_prog 0) s /\
+    step (activation (fun _ _ => None) gvn_prog 0) s l gvn_binding_state /\
+    val (nsv gvn_problem) gvn_binding_state gvn_second = Some c /\
+    val (nsv gvn_problem) s gvn_second <> Some c /\
+    val (nsv gvn_problem) gvn_binding_state gvn_first = Some d.
+Theorem gvn_binding_home_dominates :
+  strictly_dominates (cfg (base (nsv gvn_problem)))
+    (home (nsv gvn_problem) gvn_first) (home (nsv gvn_problem) gvn_second).
+Theorem gvn_binding_equal :
+  exists c d, val (nsv gvn_problem) gvn_binding_state gvn_second = Some c /\
+    val (nsv gvn_problem) gvn_binding_state gvn_first = Some d /\ c = d.
+(* gvn_binding_equal uses numbering_check_sound and the independent witness. *)
+Definition gvn_use_prog : program.
+(* The same computations, followed by a distinct block 2 that uses s2. *)
+Definition gvn_use_problem : numbering_problem astate event label ssa_edge vid sop cval.
+(* nsv is ssa_block_view (fun _ _ => None) gvn_use_prog 0, pure is false exactly for OExt _,
+   and nvalues is values_of gvn_use_prog 0. *)
+Definition gvn_use_state : astate.
+Definition gvn_use_observation : numbering_observation unit astate label ssa_edge vid.
+Theorem gvn_use_observation_laws :
+  numbering_observation_laws (activation (fun _ _ => None) gvn_use_prog 0)
+    gvn_use_problem gvn_use_observation.
+Theorem gvn_use_witness :
+  reachable_state (activation (fun _ _ => None) gvn_use_prog 0) gvn_use_state /\
+  observation_state gvn_use_observation tt = gvn_use_state /\
+  observation_ready gvn_use_observation tt gvn_first /\
+  observation_ready gvn_use_observation tt gvn_second /\
+  strictly_dominates (cfg (base (nsv gvn_use_problem)))
+    (home (nsv gvn_use_problem) gvn_first) (point (base (nsv gvn_use_problem)) gvn_use_state) /\
+  strictly_dominates (cfg (base (nsv gvn_use_problem)))
+    (home (nsv gvn_use_problem) gvn_second) (point (base (nsv gvn_use_problem)) gvn_use_state) /\
+  (exists c, val (nsv gvn_use_problem) gvn_use_state gvn_first = Some c) /\
+  (exists d, val (nsv gvn_use_problem) gvn_use_state gvn_second = Some d).
+Theorem gvn_use_equal :
+  exists c, val (nsv gvn_use_problem) gvn_use_state gvn_first = Some c /\
+    val (nsv gvn_use_problem) gvn_use_state gvn_second = Some c.
+(* ANA-5 proves the independent witness and applies numbering_use_sound for gvn_use_equal. *)
+Definition gvn_loop_prog : program.
+Definition gvn_loop_problem : numbering_problem astate event label ssa_edge vid sop cval.
+Definition gvn_loop_info : loop_info label.
+Definition gvn_loop_value : vid.
+(* nsv is ssa_block_view (fun _ _ => None) gvn_loop_prog 0, pure is false exactly for OExt _,
+   and nvalues is values_of gvn_loop_prog 0. The loop value is its inside-body pure addition,
+   not an outside-home value; its arguments are the independently bound entry parameters. *)
+Theorem gvn_loop_laws :
+  numbering_loop_laws (activation (fun _ _ => None) gvn_loop_prog 0) gvn_loop_problem.
+Theorem gvn_loop_wf : loop_info_wf (cfg (base (nsv gvn_loop_problem))) gvn_loop_info.
+Theorem gvn_loop_invariant : invariant_in gvn_loop_problem gvn_loop_info gvn_loop_value = true.
+Theorem gvn_loop_stability :
+  loop_operands_stable (activation (fun _ _ => None) gvn_loop_prog 0)
+    gvn_loop_problem gvn_loop_info gvn_loop_value.
+Theorem gvn_loop_run : exists s tr t,
+  reachable_state (activation (fun _ _ => None) gvn_loop_prog 0) s /\
+  exec_in (activation (fun _ _ => None) gvn_loop_prog 0)
+    (fun u => body gvn_loop_info (point (base (nsv gvn_loop_problem)) u) = true) s tr t /\
+  s <> t.
+Theorem gvn_loop_sound : forall s tr1 u1 tr2 u2 tr3 u3,
+  reachable_state (activation (fun _ _ => None) gvn_loop_prog 0) s ->
+  exec_in (activation (fun _ _ => None) gvn_loop_prog 0)
+    (fun u => body gvn_loop_info (point (base (nsv gvn_loop_problem)) u) = true) s tr1 u1 ->
+  exec_in (activation (fun _ _ => None) gvn_loop_prog 0)
+    (fun u => body gvn_loop_info (point (base (nsv gvn_loop_problem)) u) = true) u1 tr2 u2 ->
+  exec_in (activation (fun _ _ => None) gvn_loop_prog 0)
+    (fun u => body gvn_loop_info (point (base (nsv gvn_loop_problem)) u) = true) u2 tr3 u3 ->
+  val (nsv gvn_loop_problem) u1 gvn_loop_value <>
+    val (nsv gvn_loop_problem) u2 gvn_loop_value ->
+  val (nsv gvn_loop_problem) u2 gvn_loop_value =
+    val (nsv gvn_loop_problem) u3 gvn_loop_value.
+(* A loop recomputes a pure addition of entry arguments on each iteration; those arguments are
+   stable throughout the loop. ANA-5 proves its numbering_loop_laws, loop_info_wf,
+   invariant_in and loop_operands_stable premises, proves a reachable nonempty loop run, and
+   applies loop_invariant_sound to that actual Ssa client as gvn_loop_sound. *)
 Example gvn_merges :
   dominator_numbering label_encoding var_encoding sop_encoding gvn_problem gvn_second =
     dominator_numbering label_encoding var_encoding sop_encoding gvn_problem gvn_first /\
-  numbering_check var_encoding gvn_problem
+  numbering_check label_encoding var_encoding sop_encoding gvn_problem
     (dominator_numbering label_encoding var_encoding sop_encoding gvn_problem) = true.
 (* Card: ANA-5 for gvn_prog, its values, gvn_problem and gvn_merges. *)
 (** E-graphs: with the rule `x * 1 -> x` for 32-bit integers, the pipeline returns the term `x`, with

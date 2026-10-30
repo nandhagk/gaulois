@@ -705,22 +705,84 @@ Record numbering_problem (S O N E V K C : Type) : Type := NumberingProblem {
   pure : K -> bool;
   nvalues : list V
 }.
+Arguments NumberingProblem {S O N E V K C}.
+Arguments nsv {S O N E V K C}.
+Arguments pure {S O N E V K C}.
+Arguments nvalues {S O N E V K C}.
 Definition dominator_numbering {S O N E V K C} (EN : encoding N) (EV : encoding V) (EK : encoding K)
     (np : numbering_problem S O N E V K C) : V -> V.
 (* leader of x: a depth-first walk of the dominator tree (the tree of Graph's `dominator_tree`,
    whose ancestry implies dominance) with a scoped Table keyed by (operator, leaders of the
    arguments); parameters of one block whose per-edge arguments have equal leaders share one *)
-Definition optimistic_numbering {S O N E V K C} (EV : encoding V) (EK : encoding K)
+Definition optimistic_numbering {S O N E V K C} (EN : encoding N) (EV : encoding V)
+    (EK : encoding K)
     (np : numbering_problem S O N E V K C) : V -> V.
 (* the coarsest congruence: start with one class per (operator or block), refine until stable *)
-Definition numbering_check {S O N E V K C} (EV : encoding V) (np : numbering_problem S O N E V K C)
+Definition numbering_check {S O N E V K C} (EN : encoding N) (EV : encoding V) (EK : encoding K)
+    (np : numbering_problem S O N E V K C)
     (rep : V -> V) : bool.
-(* every class is a congruence: its members are pure Ops of one operator with pairwise same-class
-   arguments, or Params of one block (at any positions) such that, for every edge into the block,
-   the arguments at the members' positions are same-class; Arbitrary values are alone. Acceptance
-   evidence: `dominator_numbering_checked`, `optimistic_numbering_checked`, and the required Example
-   `gvn_merges` in ExamplesSsaANA5Test.v, where the producer merges two computations *)
+(* Only listed values are compared. Distinct class members are pure Ops of one operator with
+   listed pairwise same-class arguments, or Params of one non-entry block such that every listed
+   incoming edge has listed same-class arguments at both positions. Arbitrary values and entry
+   Params are singleton classes. A missing operand prevents a merge. The producers obey the same
+   boundary; optimistic numbering is the coarsest stable congruence subject to it. *)
+
+(* An observation context identifies a state and a shared predecessor for each block. It may
+   distinguish separate visits to the same state, including repeated visits around a loop. *)
+Record numbering_observation (H S N E V : Type) : Type := NumberingObservation {
+  observation_state : H -> S;
+  observation_ready : H -> V -> Prop;
+  observation_rank : H -> V -> nat;
+  observation_previous : H -> N -> option (E * H)
+}.
+Arguments NumberingObservation {H S N E V}.
+Arguments observation_state {H S N E V}.
+Arguments observation_ready {H S N E V}.
+Arguments observation_rank {H S N E V}.
+Arguments observation_previous {H S N E V}.
+
+(* These local equations do not assume equality of numbered values. A ready Op with a value
+   has ready, defined operands of smaller ranks in this context. A ready non-entry Param with a
+   value reads the indexed argument in the one shared preceding context for its block. That
+   edge is a listed incoming edge; its source state is reachable and the edge is actually taken
+   on a step, after which a finite run reaches the observed state. *)
+Record numbering_observation_laws {H S O N E V K C} (m : semantics S O)
+    (np : numbering_problem S O N E V K C) (ob : numbering_observation H S N E V) : Prop :=
+    NumberingObservationLaws {
+  observed_op : forall h x o args c,
+    observation_ready ob h x -> def (nsv np) x = Op o args -> pure np o = true ->
+    val (nsv np) (observation_state ob h) x = Some c ->
+    exists cs, Forall2 (fun y d => observation_ready ob h y /\
+      observation_rank ob h y < observation_rank ob h x /\
+      val (nsv np) (observation_state ob h) y = Some d) args cs /\
+      op_eval (nsv np) o cs = Some c;
+  observed_param : forall h x b i c,
+    observation_ready ob h x -> def (nsv np) x = Param b i ->
+    ~ In b (Graph.entries (cfg (base (nsv np)))) ->
+    val (nsv np) (observation_state ob h) x = Some c ->
+    exists e h' z l t tr, observation_previous ob h b = Some (e, h') /\
+      In e (edges_of (cfg (base (nsv np)))) /\ Graph.target (cfg (base (nsv np))) e = b /\
+      nth_error (edge_args (nsv np) e) i = Some z /\ observation_ready ob h' z /\
+      observation_rank ob h' z < observation_rank ob h x /\
+      val (nsv np) (observation_state ob h') z = Some c /\
+      reachable_state m (observation_state ob h') /\
+      step m (observation_state ob h') l t /\
+      taken (base (nsv np)) (observation_state ob h') l t e /\
+      exec m t tr (observation_state ob h)
+}.
+
+Record numbering_loop_laws {S O N E V K C} (m : semantics S O)
+    (np : numbering_problem S O N E V K C) : Prop := NumberingLoopLaws {
+  loop_op_binding : forall s l t x o args,
+    reachable_state m s -> step m s l t -> def (nsv np) x = Op o args ->
+    pure np o = true -> val (nsv np) t x <> val (nsv np) s x ->
+    exists cs c, Forall2 (fun y d => val (nsv np) s y = Some d) args cs /\
+      op_eval (nsv np) o cs = Some c /\ val (nsv np) t x = Some c
+}.
 Record loop_info (N : Type) : Type := LoopInfo { header : N; body : N -> bool }.
+Arguments LoopInfo {N}.
+Arguments header {N}.
+Arguments body {N}.
 Record loop_info_wf {N E} (g : Graph.t N E) (lp : loop_info N) : Prop := {
   header_in_body : body lp (header lp) = true;
   header_dominates : forall n, body lp n = true -> dominates g (header lp) n;
@@ -731,6 +793,12 @@ Definition invariant_in {S O N E V K C} (np : numbering_problem S O N E V K C) (
     (x : V) : bool.
 (* home x is outside the body, or def x = Op o args with pure o and every argument invariant_in;
    structural on a fuel of length (nvalues np), so a cycle of Ops answers false *)
+Definition loop_operands_stable {S O N E V K C} (m : semantics S O)
+    (np : numbering_problem S O N E V K C) (lp : loop_info N) (x : V) : Prop :=
+  forall o args y s tr t, body lp (home (nsv np) x) = true ->
+    def (nsv np) x = Op o args -> pure np o = true -> In y args -> reachable_state m s ->
+    exec_in m (fun u => body lp (point (base (nsv np)) u) = true) s tr t ->
+    val (nsv np) s y = val (nsv np) t y.
 ```
 
 ### ANA-6: e-graphs
@@ -1715,56 +1783,65 @@ preserves behaviour: the erasure of `dce_sound` does. Card: ANA-4.
 ### ANA-5
 
 ```coq
-(** A checked numbering is sound at the moment of binding: when x is bound to c, a class mate y
-    whose home strictly dominates the home of x already holds c; and class mates that are
-    parameters of one block are bound together, so they hold c at the same step. *)
-Theorem numbering_check_sound {S O N E V K C} (m : semantics S O) (EV : encoding V)
-    (np : numbering_problem S O N E V K C) (rep : V -> V) :
-  ssa_view_laws m (nsv np) -> strict_ssa_laws m (nsv np) -> numbering_check EV np rep = true ->
+(** When a checked class mate is ready and defined at the binding, it holds the bound value. *)
+Theorem numbering_check_sound {H S O N E V K C} (m : semantics S O)
+    (EN : encoding N) (EV : encoding V) (EK : encoding K)
+    (np : numbering_problem S O N E V K C) (ob : numbering_observation H S N E V)
+    (rep : V -> V) :
+  ssa_view_laws m (nsv np) -> strict_ssa_laws m (nsv np) ->
+  numbering_observation_laws m np ob -> numbering_check EN EV EK np rep = true ->
   forall x y s l s' c, rep x = rep y -> reachable_state m s -> step m s l s' ->
+    In x (nvalues np) -> In y (nvalues np) ->
     val (nsv np) s' x = Some c -> val (nsv np) s x <> Some c ->
     (strictly_dominates (cfg (base (nsv np))) (home (nsv np) y) (home (nsv np) x) \/
      exists b i j, def (nsv np) x = Param b i /\ def (nsv np) y = Param b j) ->
+    (exists h d, observation_state ob h = s' /\ observation_ready ob h x /\
+      observation_ready ob h y /\ val (nsv np) s' y = Some d) ->
     val (nsv np) s' y = Some c.
-(** A use of a class member may be replaced by another: at a point that the homes of both strictly
-    dominate, both values are defined and equal. *)
-Theorem numbering_use_sound {S O N E V K C} (m : semantics S O) (EV : encoding V)
-    (np : numbering_problem S O N E V K C) (rep : V -> V) :
-  ssa_view_laws m (nsv np) -> strict_ssa_laws m (nsv np) -> numbering_check EV np rep = true ->
+(** Defined, ready class members agree at a dominated use. *)
+Theorem numbering_use_sound {H S O N E V K C} (m : semantics S O)
+    (EN : encoding N) (EV : encoding V) (EK : encoding K)
+    (np : numbering_problem S O N E V K C) (ob : numbering_observation H S N E V)
+    (rep : V -> V) :
+  ssa_view_laws m (nsv np) -> strict_ssa_laws m (nsv np) ->
+  numbering_observation_laws m np ob -> numbering_check EN EV EK np rep = true ->
   forall x y s, rep x = rep y -> reachable_state m s ->
+    In x (nvalues np) -> In y (nvalues np) ->
     strictly_dominates (cfg (base (nsv np))) (home (nsv np) x) (point (base (nsv np)) s) ->
     strictly_dominates (cfg (base (nsv np))) (home (nsv np) y) (point (base (nsv np)) s) ->
+    (exists h c d, observation_state ob h = s /\ observation_ready ob h x /\
+      observation_ready ob h y /\ val (nsv np) s x = Some c /\ val (nsv np) s y = Some d) ->
     exists c, val (nsv np) s x = Some c /\ val (nsv np) s y = Some c.
 (** Both producers pass the checker. *)
 Theorem dominator_numbering_checked {S O N E V K C} (EN : encoding N) (EV : encoding V)
     (EK : encoding K) (np : numbering_problem S O N E V K C) :
-  numbering_check EV np (dominator_numbering EN EV EK np) = true.
-Theorem optimistic_numbering_checked {S O N E V K C} (EV : encoding V) (EK : encoding K)
+  numbering_check EN EV EK np (dominator_numbering EN EV EK np) = true.
+Theorem optimistic_numbering_checked {S O N E V K C} (EN : encoding N) (EV : encoding V)
+    (EK : encoding K)
     (np : numbering_problem S O N E V K C) :
-  numbering_check EV np (optimistic_numbering EV EK np) = true.
+  numbering_check EN EV EK np (optimistic_numbering EN EV EK np) = true.
 (** Loop invariance: during one execution of the loop, at most one step changes the value of an
     invariant. Stated by decomposition: once the value has changed between two states of the
     execution, it does not change again between the later two. *)
 Theorem loop_invariant_sound {S O N E V K C} (m : semantics S O)
     (np : numbering_problem S O N E V K C) (lp : loop_info N) (x : V) :
-  ssa_view_laws m (nsv np) -> strict_ssa_laws m (nsv np) ->
+  ssa_view_laws m (nsv np) -> strict_ssa_laws m (nsv np) -> numbering_loop_laws m np ->
   loop_info_wf (cfg (base (nsv np))) lp -> invariant_in np lp x = true ->
+  loop_operands_stable m np lp x ->
   forall s tr1 u1 tr2 u2 tr3 u3, reachable_state m s ->
     exec_in m (fun u => body lp (point (base (nsv np)) u) = true) s tr1 u1 ->
     exec_in m (fun u => body lp (point (base (nsv np)) u) = true) u1 tr2 u2 ->
     exec_in m (fun u => body lp (point (base (nsv np)) u) = true) u2 tr3 u3 ->
     val (nsv np) u1 x <> val (nsv np) u2 x -> val (nsv np) u2 x = val (nsv np) u3 x.
 ```
-Proof idea: both numbering theorems rest on the SSA equation lemma of Views (`guard_op_defined` and
-`op_args_dominate`, with `dominated_guard_holds` at dominated states): a definition whose home
-strictly dominates the point holds the operation of the current values of its operands, so two
-congruent definitions at such a point compute the same operation of equal operands, equal by
-induction on the run for parameters (bound together at the same edge, with `value_origin`) and on
-the dominance chain for operations; the producers' checks are congruence proofs, the optimistic one
-by refinement to a fixed point. `loop_invariant_sound` is an induction on the invariance
-derivation: a value homed outside the body is rebound only by entering its home, which a run in
-the body does not do (`redefine_on_edge`, `redefine_in_stay`), and an operation of invariant
-arguments is recomputed to the same value, the first recomputation being the one change.
+Proof idea: checker acceptance yields a structural congruence on listed values. Induct on the sum
+of the observation ranks: equal values are immediate, pure Ops use their equations and pairwise
+operand induction, and Params use the same preceding context and incoming edge. The extra use and
+binding premises explicitly require readiness and both values to be defined. These are local
+semantic obligations, not consequences of dominance alone. Producer acceptance uses the scoped
+congruence and fixed-point invariants. For loop invariance, an outside-home value is framed; an
+inside pure Op changes only to the result of its stable direct operands, so it cannot change twice.
+The operand-stability premise is stronger than recursive `invariant_in` and needs a client proof.
 Card: ANA-5.
 
 ### ANA-6
@@ -2078,9 +2155,9 @@ run using `byte_site_stable` and `byte_frame`
 (a changed byte of an existing allocation is covered by the writes of the node; allocations and
 frees are among those writes); immutability and invariant loads by induction with `byte_frame`,
 `footprints_disjoint_sound` and `invariant_in`. In `invariant_load_sound` the bytes half is the
-disjointness of `loop_writes` from the load, and the address half is `loop_invariant_sound` for
-`base`, so each execution of the load inside one execution of the loop reads the same bytes at the
-same address. Acceptance evidence for the MemorySSA checker: `memoryssa_accepts`. Cards: ANA-10a
+disjointness of `loop_writes` from the load. The separate address half uses `loop_invariant_sound`
+with `numbering_loop_laws` and `loop_operands_stable` for the address; these are client premises.
+Acceptance evidence for the MemorySSA checker: `memoryssa_accepts`. Cards: ANA-10a
 for byte and range laws; ANA-10e for the legacy checker and its byte theorem.
 
 ### ANA-11
@@ -2868,8 +2945,8 @@ analysis retains its existing conservative site-level `accessible` and bytewise 
 obligations; it does not use a site's identity as an epoch identifier.
 
 The original `invariant_load_sound` statement proves the byte half only. Its address-invariance
-claim is supplied separately by the already-contracted `loop_invariant_sound`; do not claim
-that the byte theorem alone proves a value or address equality.
+claim is supplied separately by `loop_invariant_sound`, with its explicit numbering loop laws and
+operand-stability premises; the byte theorem alone does not prove value or address equality.
 
 
 ## ANA-10b: memory graph
