@@ -2532,8 +2532,8 @@ ANA-3 owns the remaining declarations in this file.
 - `frame_weights` — Record; Stack weight assigned to each function.
 - `FrameWeights` — Constructor; Constructs the frame weights record.
 - `weight` — Field; Stack weight assigned to a function.
-- `stack_demand` — Definition; Bounds stack demand using call-graph paths.
-- `stack_above` — Definition; Actual stack weight above a frame in a state.
+- `stack_demand` — Definition; With a function encoding, computes finite raw-graph path demand.
+- `stack_above` — Definition; Uses a function encoding to sum active-frame weights through a frame.
 - `callee_leaf` — Definition; Tests whether a function has no possible callees.
 - `push_ctx` — Definition; Adds a call site to a bounded call string.
 - `callstring_system` — Definition; Context-indexed summary constraints.
@@ -2547,10 +2547,13 @@ ANA-3 owns the remaining declarations in this file.
 - `callers_of` — Definition; Looks up the indexed call sites of a function.
 - `arg_fact` — Definition; Joins caller argument facts for a formal parameter.
 - `resolver_sound` — Theorem; The resolver includes every possible dynamic callee.
-- `recursive_sound` — Theorem; A function active recursively lies in a recursive call component.
+- `recursive_sound` — Theorem; With a function encoding, a repeated active function lies on a cycle.
 - `unreachable_never_runs` — Theorem; Functions unreachable in the call graph never become active.
 - `purity_sound` — Theorem; A pure summary excludes observable effects during execution.
-- `stack_demand_sound` — Theorem; The path-weight summary bounds stack demand.
+- `stack_demand_exact` — Theorem; On finite closed graphs and listed queries, detects cycles and
+  returns the attained maximum raw-path weight otherwise.
+- `stack_demand_sound` — Theorem; With a function encoding and graph well-formedness, the
+  path-weight summary bounds stack demand.
 - `callee_leaf_sound` — Theorem; A leaf function makes no further call.
 - `callstring_sound` — Theorem; Context-indexed summaries cover the matching call strings.
 - `callers_index_agrees` — Theorem; The caller index contains exactly the indexed call sites.

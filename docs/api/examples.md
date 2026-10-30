@@ -1168,9 +1168,10 @@ Theorem ssa_unreachable_sound (f : func) :
 (* unreachable_never_runs, ssa_calls_laws. Card: ANA-8. *)
 
 Theorem ssa_stack_demand_sound (fw : frame_weights func) (f : func) (d : nat) :
-  wf_program ext P -> stack_demand cv (call_graph cv resolve) fw f = Some d ->
-  forall s, reachable_state m s -> In f (active cv s) -> stack_above cv fw f s <= d.
-(* stack_demand_sound, ssa_calls_laws. Card: ANA-8. *)
+  wf_program ext P -> stack_demand nat_encoding cv (call_graph cv resolve) fw f = Some d ->
+  forall s, reachable_state m s -> In f (active cv s) ->
+    stack_above nat_encoding cv fw f s <= d.
+(* stack_demand_sound, ssa_calls_laws and raw call-graph well-formedness. Card: ANA-8. *)
 
 Theorem ssa_callee_leaf_sound (f : func) :
   wf_program ext P -> callee_leaf cv f = true ->

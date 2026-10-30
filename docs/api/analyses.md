@@ -1003,12 +1003,14 @@ Definition purity_spec {S F P} (cv : calls_view S F P) (impure_local : F -> bool
 Definition purity_cover {S O I H} (ev : effects_view S I H) : step_cover S O bool :=
   {| step_covers := fun b s l s' => b = false -> l = nil /\ heap ev s' = heap ev s |}.
 Record frame_weights (F : Type) : Type := FrameWeights { weight : F -> nat }.
-Definition stack_demand {S F P} (cv : calls_view S F P) (g : Graph.t F (call_edge F P))
-    (fw : frame_weights F) (f : F) : option nat.
-(* None when f can reach a cycle of the call graph; else the maximum, over paths from f in the
-   condensation DAG, of the sum of weight (DAG max-weight paths of Graph) *)
-Definition stack_above {S F P} (cv : calls_view S F P) (fw : frame_weights F) (f : F) (s : S) : nat.
-(* the sum of weight over the frames of s from the innermost up to the topmost activation of f *)
+Definition stack_demand {S F P} (EF : encoding F) (cv : calls_view S F P)
+    (g : Graph.t F (call_edge F P)) (fw : frame_weights F) (f : F) : option nat.
+(* Its exact raw-graph contract is stack_demand_exact, for graph_wf and a listed query.
+   Outside that domain its result has no specified meaning. *)
+Definition stack_above {S F P} (EF : encoding F) (cv : calls_view S F P)
+    (fw : frame_weights F) (f : F) (s : S) : nat.
+(* Sum the innermost-first active list through the first occurrence of f, inclusive; if f
+   is absent, sum the entire list. *)
 Definition callee_leaf {S F P} (cv : calls_view S F P) (f : F) : bool :=
   match sites_of cv f with nil => true | _ => false end.   (* callee shape: no call site *)
 (* Call strings as unknowns: contexts are the last k call sites. *)
@@ -1985,8 +1987,8 @@ Theorem resolver_sound {S O F P V C A} (m : semantics S O) (cv : calls_view S F 
         forall l0, fns (fact v) = Some l0 -> In f l0)) ->
   calls_view_laws m cv (resolver direct callee_val fact fns (functions cv)).
 (** Recursion: a function active twice on the stack is on a cycle of the call graph. *)
-Theorem recursive_sound {S O F P} (m : semantics S O) (cv : calls_view S F P)
-    (resolve : P -> list F) (s : S) :
+Theorem recursive_sound {S O F P} (EF : encoding F) (m : semantics S O)
+    (cv : calls_view S F P) (resolve : P -> list F) (s : S) :
   calls_view_laws m cv resolve -> reachable_state m s -> ~ NoDup (active cv s) ->
   exists f, In f (active cv s) /\ recursive (call_graph cv resolve) f.
 (** Whole-program reachability: a function unreachable in the call graph never runs. *)
@@ -2004,13 +2006,25 @@ Theorem purity_sound {S O I H F P} (m : semantics S O) (cv : calls_view S F P)
     sigma ->
   forall s l s' f, reachable_state m s -> step m s l s' -> In f (active cv s) -> sigma f = false ->
     l = nil /\ heap ev s' = heap ev s.
-(** Stack demand: the frames above the topmost activation of f, f included, weigh at most the
-    demand, when it is finite. *)
-Theorem stack_demand_sound {S O F P} (m : semantics S O) (cv : calls_view S F P)
-    (resolve : P -> list F) (fw : frame_weights F) (f : F) (d : nat) :
-  calls_view_laws m cv resolve ->
-  stack_demand cv (call_graph cv resolve) fw f = Some d ->
-  forall s, reachable_state m s -> In f (active cv s) -> stack_above cv fw f s <= d.
+(** Exact demand detects precisely reachable nonempty cycles and otherwise gives an attained
+    maximum over raw path weights. *)
+Theorem stack_demand_exact {S F P} (EF : encoding F) (cv : calls_view S F P)
+    (g : Graph.t F (call_edge F P)) (fw : frame_weights F) (f : F) :
+  graph_wf g -> In f (Graph.nodes g) ->
+  (stack_demand EF cv g fw f = None <->
+    exists v prefix e suffix, path g f prefix v /\ path g v (e :: suffix) v) /\
+  (forall d, stack_demand EF cv g fw f = Some d ->
+    (forall es v, path g f es v ->
+      weight fw f + fold_right (fun e n => weight fw (Graph.target g e) + n) 0 es <= d) /\
+    (exists es v, path g f es v /\
+      weight fw f + fold_right (fun e n => weight fw (Graph.target g e) + n) 0 es = d)).
+(** Stack demand bounds the frames through the innermost activation of f when finite. *)
+Theorem stack_demand_sound {S O F P} (EF : encoding F) (m : semantics S O)
+    (cv : calls_view S F P) (resolve : P -> list F) (fw : frame_weights F)
+    (f : F) (d : nat) :
+  calls_view_laws m cv resolve -> graph_wf (call_graph cv resolve) ->
+  stack_demand EF cv (call_graph cv resolve) fw f = Some d ->
+  forall s, reachable_state m s -> In f (active cv s) -> stack_above EF cv fw f s <= d.
 (** Callee shape: a leaf function never calls. *)
 Theorem callee_leaf_sound {S O F P} (m : semantics S O) (cv : calls_view S F P)
     (resolve : P -> list F) (f : F) :
