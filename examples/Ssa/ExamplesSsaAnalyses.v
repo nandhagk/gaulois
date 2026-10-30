@@ -13,12 +13,12 @@ From Gaulois.Domains Require Import DomainsNumeric DomainsConst.
 From Gaulois.Graph Require Import GraphCore.
 From Gaulois.Fixpoint Require Import FixpointQuery FixpointSystem.
 From Gaulois.Analyses Require Import AnalysesLiveness AnalysesDemand AnalysesEgraph
-  AnalysesValues AnalysesPaths.
+  AnalysesValues AnalysesPaths AnalysesPointsTo.
 From Gaulois.Views Require Import ViewsSemantics ViewsGraph ViewsAgreement ViewsSsa ViewsDominated.
 From Gaulois.Examples.While Require Import ExamplesWhileSemantics.
 From Gaulois.Examples.Ssa Require Import ExamplesSsaSyntax ExamplesSsaTyping
   ExamplesSsaSemantics ExamplesSsaTypingProofs ExamplesSsaActivation ExamplesSsaViews
-  ExamplesSsaBridge ExamplesSsaStrict.
+  ExamplesSsaBridge ExamplesSsaStrict ExamplesSsaPointers.
 Import List.ListNotations.
 Local Open Scope nat_scope.
 
@@ -370,3 +370,71 @@ Proof.
     (ssa_block_view_laws ext P f Hwf Hfunction) (ssa_strict_laws ext P f Hwf Hfunction)
     s Hreachable).
 Qed.
+
+(** * Full-machine pointer analyses *)
+
+Section SsaPointerWrappers.
+Context (ext : nat -> list cval -> option cval) (P : program) (lim : limits).
+
+(** Every recognized SSA pointer and stored pointer belongs to any inclusion post-solution. *)
+Theorem ssa_andersen_sound (sigma : pts_key vid vid -> pts_set var_encoding (ssa_ptr_ops P)) :
+  wf_program ext P ->
+  post_solution (pts_lattice var_encoding (ssa_ptr_ops P))
+    (andersen_system var_encoding var_encoding (ssa_ptr_ops P)) sigma ->
+  forall s, reachable_state (ssa_semantics ext P lim) s ->
+    (forall x t, pts_of (ssa_ptr_view ext P lim) s x = Some t ->
+      fmem var_encoding t (sigma (PVal x)) = true) /\
+    (forall t0 t, heap_pts (ssa_ptr_view ext P lim) s t0 t ->
+      fmem var_encoding t (sigma (PHeap t0)) = true).
+Proof.
+  intros Hwf Hpost s Hreach.
+  destruct (relational_andersen_sound (ssa_semantics ext P lim) (ssa_rel_ptr_view P)
+    var_encoding var_encoding (ssa_ptr_ops P) sigma
+    (ssa_rel_ptr_laws ext P lim (ssa_ptr_ops P) Hwf (fun _ Hin => Hin)) Hpost s Hreach)
+    as [Hvalues Hheap].
+  split.
+  - intros x t Hpts; apply Hvalues; eapply ssa_rel_value_covers; eassumption.
+  - intros t0 t Hpts; apply Hheap; eapply ssa_rel_heap_covers; eassumption.
+Qed.
+
+(** SSA values pointing into one site have unified Steensgaard pointee classes. *)
+Theorem ssa_steensgaard_sound :
+  wf_program ext P ->
+  forall s x y t, reachable_state (ssa_semantics ext P lim) s ->
+    pts_of (ssa_ptr_view ext P lim) s x = Some t ->
+    pts_of (ssa_ptr_view ext P lim) s y = Some t ->
+    may_alias (steensgaard var_encoding var_encoding (ssa_ptr_ops P)) x y.
+Proof.
+  intros Hwf s x y t Hreach Hx Hy.
+  destruct (ssa_andersen_sound (andersen_delta var_encoding var_encoding (ssa_ptr_ops P))
+    Hwf (proj1 (andersen_delta_least var_encoding var_encoding (ssa_ptr_ops P))) s Hreach)
+    as [Hvalues Hheap].
+  eapply steensgaard_coarser; [apply andersen_delta_least|apply Hvalues; exact Hx|
+    apply Hvalues; exact Hy].
+Qed.
+
+(** Actual escaping values and their stored pointers belong to the computed least closure. *)
+Theorem ssa_escape_sound (sigma : pts_key vid vid -> pts_set var_encoding (ssa_ptr_ops P)) :
+  wf_program ext P ->
+  post_solution (pts_lattice var_encoding (ssa_ptr_ops P))
+    (andersen_system var_encoding var_encoding (ssa_ptr_ops P)) sigma ->
+  forall s x t t', reachable_state (ssa_semantics ext P lim) s ->
+    In (PEscape x) (pop (ssa_ptr_view ext P lim) s) ->
+    pts_of (ssa_ptr_view ext P lim) s x = Some t ->
+    FinSet.mem var_encoding t (escaped_sites var_encoding (ssa_ptr_ops P) sigma) = true /\
+    (heap_pts (ssa_ptr_view ext P lim) s t t' ->
+      FinSet.mem var_encoding t' (escaped_sites var_encoding (ssa_ptr_ops P) sigma) = true).
+Proof.
+  intros Hwf Hpost s x t t' Hreach Hescape Hpts.
+  destruct (ssa_andersen_sound sigma Hwf Hpost s Hreach) as [Hvalues Hheap].
+  assert (Hroot : FinSet.mem var_encoding t (escaped_sites var_encoding (ssa_ptr_ops P) sigma)
+    = true).
+  { eapply escaped_sites_root.
+    - exact (ssa_ptr_pop_listed ext P lim (ssa_ptr_ops P) Hwf (fun _ Hin => Hin)
+        s (PEscape x) Hreach Hescape).
+    - apply Hvalues; exact Hpts. }
+  split; [exact Hroot|].
+  intro Hstored; eapply escaped_sites_step; [exact Hroot|apply Hheap; exact Hstored].
+Qed.
+
+End SsaPointerWrappers.
