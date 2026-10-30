@@ -2065,7 +2065,8 @@ Proof idea: the resolver law is a case analysis on the three clauses against the
 frame-chain invariant of `active_reachable_in_call_graph`; purity by `summary_sound` with
 `purity_cover`; for exact stack demand, prove raw paths and cycles correspond to those of the
 target-deduplicated finite graph, reroot it at `f`, and prove both cycle detection directions and
-the attained maximum weight. For stack soundness, use the actual frame path and `stack_demand_exact`;
+the attained maximum weight. For stack soundness, use the actual frame path and
+`stack_demand_exact`;
 the leaf by `step_shape`; call strings by the proof of `summary_sound` with the
 context carried; the index by a fold over the sites; arguments by the call-step law,
 `callers_index_agrees`, the join upper bound and `gamma_monotone`. The resolver in `arg_fact_sound`
