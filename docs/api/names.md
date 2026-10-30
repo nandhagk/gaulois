@@ -1062,7 +1062,10 @@ Contract: [Examples](examples.md).
 
 - `ssa_ptr_ops`, `ssa_ptr_view`, `ssa_footprints` — Definitions; pointer effects, view and
   footprints.
-- `ssa_ptr_laws`, `ssa_zero_laws` — Theorems; pointer and zero-fact adapter laws.
+- `ssa_raw_site`, `ssa_rel_ptr_view` — Definitions; speculative sites and relational observations.
+- `ssa_rel_ptr_laws`, `ssa_rel_value_covers`, `ssa_rel_heap_covers` — Theorems; relational laws
+  and concrete observation coverage.
+- `ssa_ptr_pop_listed`, `ssa_zero_laws` — Theorems; effect inventory and zero-fact adapter laws.
 
 ### `ExamplesSsaBytes.v` — ANA-10a
 
@@ -2585,6 +2588,13 @@ ANA-3 owns the remaining declarations in this file.
 
 ### `AnalysesPointsTo.v` — ANA-9
 
+- `relational_ptr_view`, `RelationalPtrView`, `rel_value`, `rel_heap` — Record, constructor and
+  fields; relational value and heap observations.
+- `relational_ptr_laws`, `Build_relational_ptr_laws` — Record and constructor; initial and
+  step-origin laws for relational observations.
+- `rel_value_initial`, `rel_heap_initial`, `rel_value_origin`, `rel_heap_origin` — Fields;
+  independent initial and step-origin obligations.
+- `relational_andersen_sound` — Theorem; post-solutions include relational observations.
 - `steens_result` — Record; Pointer classes and their associated pointee classes.
 - `SteensResult` — Constructor; Constructs the steens result record.
 - `classes` — Field; Union-find classes of pointer variables.

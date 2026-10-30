@@ -1050,7 +1050,7 @@ Definition arg_fact {S F P V C A} (EF : encoding F) (av : args_view S F P V C)
    denotes the allocation `loc_of s c` (an identity of type `L`) at the offset `loc_offset s c`
    (VIEW-7), and a byte is addressed by a pointer value. *)
 Inductive ptr_op (V T : Type) : Type :=
-  | PAlloc (x : V) (site : T)            (* x holds a fresh pointer from the site *)
+  | PAlloc (x : V) (site : T)            (* include site in x; an allocation is one source *)
   | PCopy (x y : V)                      (* x = y, a pointer-preserving operation of y, a callee
                                             parameter bound to an actual, or a call result bound to
                                             a returned value *)
@@ -1125,6 +1125,36 @@ Record ptr_view_laws {S O V C L T} (m : semantics S O) (pv : ptr_view S V C L T)
     heap_pts pv s' t0 t -> heap_pts pv s t0 t \/
     (exists p y, In (PStore p y) (pop pv s) /\ pts_of pv s p = Some t0 /\ pts_of pv s y = Some t)
 }.
+
+(* Relational observations may include speculative sites and multiple active values per key.
+   A PAlloc occurrence is an inclusion seed and need not represent a dynamic allocation. *)
+Record relational_ptr_view (S V T : Type) : Type := RelationalPtrView {
+  rel_value : S -> V -> T -> Prop;
+  rel_heap : S -> T -> T -> Prop
+}.
+Arguments RelationalPtrView {S V T}.
+Arguments rel_value {S V T}.
+Arguments rel_heap {S V T}.
+
+Record relational_ptr_laws {S O V T} (m : semantics S O)
+    (rv : relational_ptr_view S V T) (ops : list (ptr_op V T)) : Prop := {
+  rel_value_initial : forall s x t, initial m s -> rel_value rv s x t ->
+    In (PAlloc x t) ops;
+  rel_heap_initial : forall s t0 t, initial m s -> rel_heap rv s t0 t -> False;
+  rel_value_origin : forall s l s' x t, reachable_state m s -> step m s l s' ->
+    rel_value rv s' x t ->
+    rel_value rv s x t \/ In (PAlloc x t) ops \/
+    (exists y, In (PCopy x y) ops /\ rel_value rv s y t) \/
+    (exists p t0, In (PLoad x p) ops /\ rel_value rv s p t0 /\ rel_heap rv s t0 t);
+  rel_heap_origin : forall s l s' t0 t, reachable_state m s -> step m s l s' ->
+    rel_heap rv s' t0 t -> rel_heap rv s t0 t \/
+    (exists p y, In (PStore p y) ops /\ rel_value rv s p t0 /\ rel_value rv s y t)
+}.
+Arguments Build_relational_ptr_laws {S O V T m rv ops}.
+Arguments rel_value_initial {S O V T m rv ops}.
+Arguments rel_heap_initial {S O V T m rv ops}.
+Arguments rel_value_origin {S O V T m rv ops}.
+Arguments rel_heap_origin {S O V T m rv ops}.
 Record steens_result (V : Type) : Type := SteensResult {
   classes : UnionFind.t positive;
   pointee : V -> positive                  (* the class of what the value points to *)
@@ -2040,6 +2070,15 @@ Theorem andersen_sound {S O V C L T} (m : semantics S O) (pv : ptr_view S V C L 
   forall s, reachable_state m s ->
     (forall x t, pts_of pv s x = Some t -> fmem ET t (sigma (PVal x)) = true) /\
     (forall t0 t, heap_pts pv s t0 t -> fmem ET t (sigma (PHeap t0)) = true).
+(** Every relational value and heap observation belongs to any post-solution. *)
+Theorem relational_andersen_sound {S O V T} (m : semantics S O)
+    (rv : relational_ptr_view S V T) (EV : encoding V) (ET : encoding T)
+    (ops : list (ptr_op V T)) (sigma : pts_key V T -> pts_set ET ops) :
+  relational_ptr_laws m rv ops ->
+  post_solution (pts_lattice ET ops) (andersen_system EV ET ops) sigma ->
+  forall s, reachable_state m s ->
+    (forall x t, rel_value rv s x t -> fmem ET t (sigma (PVal x)) = true) /\
+    (forall t0 t, rel_heap rv s t0 t -> fmem ET t (sigma (PHeap t0)) = true).
 (** The system is monotone, and the total engine terminates on it under every scheduler: the
     universe has no duplicates, so the lattice has a height. *)
 Theorem andersen_monotone {V T} (EV : encoding V) (ET : encoding T) (ops : list (ptr_op V T)) :
@@ -2083,7 +2122,9 @@ Theorem zero_written_sound {S O N E V C L T} (m : semantics S O) (EF : encoding 
     ~ covered (FinSet.elements (proj1_sig (sigma (point gv s)))) t (loc_offset (pmem pv) s c) 1 ->
     pbyte pv s c = Some n -> n = 0.
 ```
-Proof idea: `andersen_sound` by induction on `exec` with `pts_origin` and `heap_origin`: a new
+Proof idea: `relational_andersen_sound` follows by induction on `exec`, using initial seeds and
+the four independent inclusion rules obtained from the post-solution. `andersen_sound` follows
+by induction on `exec` with `pts_origin` and `heap_origin`: a new
 fact is derived by one of the five instruction kinds (a callee parameter or a returned pointer is
 a `PCopy`), and each kind's constraint (reading sets, `Side` contributions to the heap unknowns)
 bounds it; the system is a post-solution, which includes the `Query.sides` bounds. Monotonicity

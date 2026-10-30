@@ -538,17 +538,29 @@ Definition ssa_mem_view (ext : nat -> list cval -> option cval) (P : program) (l
    IStore MemStore p 0 (size) v, IFree MemFree p *)
 (* ExamplesSsaPointers.v. Card: ANA-9. *)
 Definition ssa_ptr_ops (P : program) : list (ptr_op vid vid).
-(* every pointer effect that the program can have: PAlloc x x for each IAlloc x _; PCopy x p for each
-   OPtrAdd; PLoad and PStore for the pointer-typed loads and stores; PEscape for a pointer output
-   and for the pointer arguments of an indirect call; PCopy formal actual for the pointer arguments
-   of each call to each function of the resolver; PCopy continuation-parameter value for each
-   pointer return to each call site that may call the returning function *)
+(* PAlloc x x for each IAlloc x _; PCopy x p for each OPtrAdd; PLoad and PStore for
+   pointer-typed loads and stores; PEscape for a pointer output and for pointer arguments of an
+   indirect call; PCopy formal actual for each pointer argument of each call to each resolved
+   function; PCopy continuation-parameter value for each pointer return to each call site that
+   may call the returning function; and PCopy parameter actual for each pointer block parameter
+   and corresponding argument on every jump, branch and switch edge. For each pointer-typed main
+   entry parameter, pointer constant result and pointer-typed OExt result x, include PAlloc x t
+   for every allocation site t of P. These last operations are static inclusion seeds, not
+   allocation events. Preserve instruction occurrences and duplicates. *)
 Definition ssa_ptr_view (ext : nat -> list cval -> option cval) (P : program) (lim : limits) :
   ptr_view state vid cval nat vid.
 (* pval s x = the value of x in the innermost frame of the function that defines x; pop s = the
    pointer effects of the next step, for the frames that the step involves; held s c = the pointer
    value reassembled from the eight fragments at the address that c denotes; pbyte s c = the byte at
    that address, when the block is live and the byte is an MInt *)
+Definition ssa_raw_site (P : program) (s : state) (c : cval) (t : vid) : Prop.
+(* False unless c = VPtr b o and t is an IAlloc site of P. If mem s b = Some mb, require
+   msite mb = t; if mem s b = None, accept every IAlloc site of P. Dead blocks remain present
+   and retain their historical site. *)
+Definition ssa_rel_ptr_view (P : program) : relational_ptr_view state vid vid.
+(* rel_value holds when any active frame binds x to c and ssa_raw_site P s c t. rel_heap holds
+   when a retained block at site t0 has an MFrag c i at any byte offset and ssa_raw_site P s c t.
+   This includes partial fragments and dead blocks. *)
 Definition ssa_footprints (P : program) : full_edge -> list (footprint vid).
 (* for an edge leaving an IAlloc, IStore, IFree or TCall, the range [0, 2^64) of every allocation
    site of P; nil elsewhere. These are the ranges for the zero facts of ANA-9. *)
@@ -1016,10 +1028,23 @@ Theorem ssa_full_view_laws (ext : nat -> list cval -> option cval) (P : program)
   graph_view_laws (ssa_semantics ext P lim) (ssa_full_view ext P lim).
 Theorem ssa_mem_laws (ext : nat -> list cval -> option cval) (P : program) (lim : limits) :
   wf_program ext P -> mem_view_laws (ssa_semantics ext P lim) (ssa_mem_view ext P lim).
-Theorem ssa_ptr_laws (ext : nat -> list cval -> option cval) (P : program) (lim : limits)
+Theorem ssa_rel_ptr_laws (ext : nat -> list cval -> option cval) (P : program) (lim : limits)
     (ops : list (ptr_op vid vid)) :
   wf_program ext P -> incl (ssa_ptr_ops P) ops ->
-  ptr_view_laws (ssa_semantics ext P lim) (ssa_ptr_view ext P lim) ops.
+  relational_ptr_laws (ssa_semantics ext P lim) (ssa_rel_ptr_view P) ops.
+Theorem ssa_rel_value_covers (ext : nat -> list cval -> option cval)
+    (P : program) (lim : limits) :
+  wf_program ext P -> forall s x t, reachable_state (ssa_semantics ext P lim) s ->
+  pts_of (ssa_ptr_view ext P lim) s x = Some t -> rel_value (ssa_rel_ptr_view P) s x t.
+Theorem ssa_rel_heap_covers (ext : nat -> list cval -> option cval)
+    (P : program) (lim : limits) :
+  wf_program ext P -> forall s t0 t, reachable_state (ssa_semantics ext P lim) s ->
+  heap_pts (ssa_ptr_view ext P lim) s t0 t -> rel_heap (ssa_rel_ptr_view P) s t0 t.
+Theorem ssa_ptr_pop_listed (ext : nat -> list cval -> option cval)
+    (P : program) (lim : limits) (ops : list (ptr_op vid vid)) :
+  wf_program ext P -> incl (ssa_ptr_ops P) ops ->
+  forall s op, reachable_state (ssa_semantics ext P lim) s ->
+  In op (pop (ssa_ptr_view ext P lim) s) -> In op ops.
 Theorem ssa_bytes_laws (ext : nat -> list cval -> option cval) (P : program) (lim : limits) :
   wf_program ext P -> bytes_laws (ssa_semantics ext P lim) (ssa_bytes_view ext P lim).
 Theorem ssa_zero_laws (ext : nat -> list cval -> option cval) (P : program) (lim : limits) :
@@ -1027,17 +1052,21 @@ Theorem ssa_zero_laws (ext : nat -> list cval -> option cval) (P : program) (lim
   zero_laws (ssa_semantics ext P lim) (ssa_full_view ext P lim) (ssa_ptr_view ext P lim)
     (ssa_footprints P).
 ```
-Proof idea: a block is never removed and its site never changes (`site_stable`); the pointer effect
-of a step is read off the instruction (`PAlloc` for an allocation, `PCopy` for a pointer addition, a
-call parameter or a returned pointer, `PLoad` and `PStore` for the pointer-typed loads and stores);
-a byte changes only by a store, an allocation or a free, whose `writes_at` covers every site and
+Proof idea: a block is never removed and its site never changes (`site_stable`). An unknown raw
+pointer permits all program sites, so its possible sites only narrow on allocation. All active
+frames are observed, including recursive callers; bind parameters by their edge copies. Track each
+pointer fragment, including incomplete reconstructions: a store preserves it or writes its source
+pointer, and a successful pointer load exposes a matching fragment. Allocation writes zero bytes.
+Pointer constants, extension results and main inputs use static seeds. Prove each relational origin
+without assuming an analysis result, and separately prove concrete observation coverage. A
+byte changes only by a store, an allocation or a free, whose `writes_at` covers every site and
 offset (`byte_frame`); `allocation_size_in_range` bounds each allocated block below 2^64; an
 allocation zero-fills its block and a block that exists is
 changed only by a store or a free, whose footprints cover it (`z_fresh`, `z_kept`; a freed block
 reads as no byte). For `z_address`, a `VPtr` retains its block number and offset, and an existing
 block has a site that `ssa_mem_laws` preserves, including after free. Card: EX-6 for
-`ssa_full_view_laws` and `ssa_mem_laws`; ANA-9 for
-`ssa_ptr_laws` and `ssa_zero_laws`; ANA-10a for `ssa_bytes_laws`.
+`ssa_full_view_laws` and `ssa_mem_laws`; ANA-9 for the relational pointer laws, coverage,
+pointer-effect inventory and `ssa_zero_laws`; ANA-10a for `ssa_bytes_laws`.
 
 ```coq
 (** Instantiation theorems: each catalogue analysis is sound on Ssa. Every line is the
@@ -1088,7 +1117,7 @@ particular, `numeric_value_sound` takes a numeric domain, `ssa_bridge` and `ssa_
 their explicit numbering-specific observation or loop premises;
 `optimise_sound` takes an operator evaluator and rewrite laws; `scev_sound` and `loop_trip_sound`
 take the corresponding recurrence and loop premises. Call, pointer and byte analyses use
-`ssa_calls_laws`, `ssa_ptr_laws` and `ssa_bytes_laws` where their generic theorem requires them.
+`ssa_calls_laws`, the relational pointer laws and `ssa_bytes_laws` where required.
 The generic theorem's other premises remain explicit; these are not additional named theorems.
 
 ```coq
@@ -1136,13 +1165,13 @@ Theorem ssa_andersen_sound (sigma : pts_key vid vid -> pts_set var_encoding (ssa
   forall s, reachable_state m s ->
     (forall x t, pts_of pv s x = Some t -> fmem var_encoding t (sigma (PVal x)) = true) /\
     (forall t0 t, heap_pts pv s t0 t -> fmem var_encoding t (sigma (PHeap t0)) = true).
-(* andersen_sound, ssa_ptr_laws with incl_refl. Card: ANA-9. *)
+(* relational_andersen_sound and concrete coverage, with incl_refl. Card: ANA-9. *)
 
 Theorem ssa_steensgaard_sound :
   wf_program ext P ->
   forall s x y t, reachable_state m s -> pts_of pv s x = Some t -> pts_of pv s y = Some t ->
     may_alias (steensgaard var_encoding var_encoding (ssa_ptr_ops P)) x y.
-(* steensgaard_sound, ssa_ptr_laws with incl_refl. Card: ANA-9. *)
+(* Apply relational soundness to andersen_delta, then steensgaard_coarser. Card: ANA-9. *)
 
 Theorem ssa_escape_sound (sigma : pts_key vid vid -> pts_set var_encoding (ssa_ptr_ops P)) :
   wf_program ext P ->
@@ -1153,7 +1182,8 @@ Theorem ssa_escape_sound (sigma : pts_key vid vid -> pts_set var_encoding (ssa_p
     FinSet.mem var_encoding t (escaped_sites var_encoding (ssa_ptr_ops P) sigma) = true /\
     (heap_pts pv s t t' ->
        FinSet.mem var_encoding t' (escaped_sites var_encoding (ssa_ptr_ops P) sigma) = true).
-(* escaped_closed, ssa_ptr_laws with incl_refl. Card: ANA-9. *)
+(* Relational soundness, concrete coverage, pointer-effect inventory and escape closure.
+   Card: ANA-9. *)
 
 Theorem ssa_immutable_sound (ty : vid) (o : Z) :
   wf_program ext P -> (forall n, covered (writes_at bv n) ty o 1 -> False) ->
