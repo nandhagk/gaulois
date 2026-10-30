@@ -1085,7 +1085,15 @@ Contract: [Examples](examples.md).
 - `factorial_while`, `factorial_while_dce`, `z_var`, `lcm_prog`, `lcm_result_ex` — Definitions;
   EX-4 factorial and lazy-code-motion fixtures.
 
-### `ExamplesSsaAnalyses.v` — EX-5a, ANA-3, ANA-5 to ANA-9, ANA-10a, ANA-10e
+### `ExamplesSsaAnalyses.v` — EX-5a, ANA-3, ANA-6, ANA-9, EX-7 facade
+
+C62 routes the ANA-5, ANA-7, ANA-8, ANA-10a and ANA-10e declarations in this inventory to
+`ExamplesSsaNumbering.v`, `ExamplesSsaScev.v`, `ExamplesSsaCalls.v`,
+`ExamplesSsaMemoryBase.v` and `ExamplesSsaMemoryLegacy.v`, respectively. EX-7 provides their
+original qualified facade paths and preserves the other paths after all six prerequisite cards
+land; until then those legacy paths are pending. EX-7 moves the existing facade body to
+`ExamplesSsaAnalysisBase.v` and retargets the five client modules before adding explicit aliases.
+The entries below retain the full compatibility inventory and their original declaration owners.
 
 - `label_encoding`, `sop_encoding`, `const_numeric`, `const_conc`, `liveness_at` — Definitions;
   EX-5a encodings, constant domain and executable liveness wrapper.

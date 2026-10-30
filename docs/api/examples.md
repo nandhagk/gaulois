@@ -42,7 +42,20 @@ Their qualified names use `Gaulois.Tests.Examples.<owned test module>` instead o
 | `ExamplesSsaMemory.v` | the full-program graph and memory views | EX-6 |
 | `ExamplesSsaPointers.v` | pointer view, footprints, pointer and zero laws | ANA-9 |
 | `ExamplesSsaBytes.v` | byte view and byte laws | ANA-10a |
-| `ExamplesSsaAnalyses.v` | instantiation theorems and fixtures, factorial included | EX-5a, ANA-3 to ANA-9, ANA-10a, ANA-10e |
+| `ExamplesSsaAnalyses.v` | landed instantiations and compatibility facade, factorial included | EX-5a, ANA-3, ANA-6, ANA-9, EX-7 |
+| `ExamplesSsaNumbering.v` | value numbering clients | ANA-5 |
+| `ExamplesSsaScev.v` | scalar recurrence clients | ANA-7 |
+| `ExamplesSsaCalls.v` | call analysis clients | ANA-8 |
+| `ExamplesSsaMemoryBase.v` | immutable-memory client | ANA-10a |
+| `ExamplesSsaMemoryLegacy.v` | legacy MemorySSA fixtures | ANA-10e |
+| `ExamplesSsaAnalysisBase.v` | common landed definitions extracted from the facade | EX-7 |
+
+Under C62, the five client modules initially import `ExamplesSsaAnalyses` for landed common
+definitions. EX-7, after those clients and ANA-9 land, moves that body to the base module,
+retargets the client imports and supplies explicit aliases in the facade for every legacy
+qualified name. The original qualified facade API is complete only after EX-7 lands; individual
+client card completion covers the listed declarations in their new modules. All names, types,
+semantics and proof obligations below remain unchanged.
 
 ## Definitions
 
